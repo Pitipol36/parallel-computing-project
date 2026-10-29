@@ -1,0 +1,20 @@
+{
+  "v": 4,
+  "createdOnFiles": {"v": 1, "at": "2026-10-29T18:00:00Z"},
+  "lists": "css",
+  "title": "BVH Ray Tracing of Large Triangle Meshes on CUDA",
+  "order": ["cover", "problem", "dataset", "sequential", "baseline", "parallel", "kernels", "correctness", "headline", "size", "scaling", "ablation", "breakdown", "limits", "qa"],
+  "sections": {
+    "intro": {"description": "The problem and the dataset", "start": "cover"},
+    "seq": {"description": "The sequential solution and why it is the best sequential version", "start": "sequential"},
+    "par": {"description": "The parallel design and the four kernel versions", "start": "parallel"},
+    "check": {"description": "Correctness: CPU and GPU produce the same image", "start": "correctness"},
+    "results": {"description": "Speedups, ablation and where the time goes", "start": "headline"},
+    "end": {"description": "Limitations, future work and questions", "start": "limits"}
+  },
+  "faces": {
+    "ibm-plex-sans": {"family": "IBM Plex Sans", "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"},
+    "jetbrains-mono": {"family": "JetBrains Mono", "href": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap"}
+  },
+  "designSystems": []
+}

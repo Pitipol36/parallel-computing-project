@@ -1,0 +1,13 @@
+<section id="size" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Speedup vs mesh size</h2>
+<div style="display:flex;gap:64px;align-items:center">
+<img src="/_blob/6e27baae45d31f8fb61f6a35f131b08a" alt="Line chart: gpu_bvh_opt kernel speedup falls from 182x on the bunny to 146x on the dragon and 113x on the Buddha; naive kernel about 35-55x; end-to-end speedup 88x to 34x" style="width:1000px;height:600px;object-fit:contain">
+<div style="flex:1;display:flex;flex-direction:column;gap:24px">
+<p style="font-size:72px;font-weight:700;color:#2A78D6;line-height:1.1">182× → 113×</p>
+<p style="font-size:32px;line-height:1.4;color:#1B2233">The gap <b>narrows</b> as the mesh grows.</p>
+<p style="font-size:24px;line-height:1.45;color:#4A5263">With a BVH the CPU’s cost grows only with log T. On the GPU a bigger tree overflows the 3 MB L2 cache, so traversal becomes memory-bound, and the upload of ~80 MB starts to count end to end.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">10 · 1920×1080, 4 AO; dashed line includes upload and download</p>
+<aside>This result surprised me, and it is the opposite of what I expected in the plan. The speedup goes down as the mesh grows: 182 times on the bunny, 146 on the dragon, 113 on the Buddha. The reason is that the BVH already made the CPU’s cost logarithmic in triangle count, while on the GPU the larger tree no longer fits in the 3 megabyte L2 cache, so threads wait on memory. End to end, the upload of the tree also starts to matter. So “bigger data” does not automatically mean a bigger GPU win.</aside>
+</section>

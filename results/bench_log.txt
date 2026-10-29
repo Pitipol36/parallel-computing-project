@@ -1,0 +1,195 @@
+﻿WARNING: data\lucy.ply missing, skipped
+
+>>> size bunny --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 3 --out renders\bunny.png
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (133 ms)
+BVH: 74887 nodes, 37444 leaves, depth 18, built in 57.1 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        742.63       742.63         16.8           
+gpu_bvh_naive               13.50        17.22        921.5      55.0x
+gpu_bvh_opt                  4.09         8.40       3042.9     181.6x
+gpu_bvh_persistent           4.61         8.78       2699.2     161.1x
+
+>>> size dragon --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 3 --out renders\dragon.png
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (890 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 774.3 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        973.70       973.70         12.8           
+gpu_bvh_naive               27.98        42.85        444.6      34.8x
+gpu_bvh_opt                  6.66        23.02       1868.9     146.3x
+gpu_bvh_persistent           6.63        21.63       1875.6     146.8x
+
+>>> size buddha --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 3 --out renders\buddha.png
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (809 ms)
+BVH: 1190261 nodes, 595131 leaves, depth 26, built in 922.3 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        936.73       936.73         13.3           
+gpu_bvh_naive               27.21        44.30        457.2      34.4x
+gpu_bvh_opt                  8.31        27.70       1497.0     112.7x
+gpu_bvh_persistent           8.90        28.80       1398.0     105.3x
+
+>>> ao dragon --width 1920 --height 1080 --ao 0 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 5
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (296 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 827.1 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 0 AO samples, ~4.1 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        358.64       358.64         11.6           
+gpu_bvh_opt                  3.92        21.33       1057.9      91.5x
+gpu_bvh_persistent           3.01        19.55       1377.5     119.1x
+
+>>> ao dragon --width 1920 --height 1080 --ao 1 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 5
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (298 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 766.9 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 1 AO samples, ~6.2 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        534.61       534.61         11.6           
+gpu_bvh_opt                  4.51        20.80       1380.4     118.6x
+gpu_bvh_persistent           4.96        21.10       1253.4     107.7x
+
+>>> ao dragon --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 5
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (292 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 766.7 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        976.01       976.01         12.7           
+gpu_bvh_opt                 11.10        27.53       1121.2      88.0x
+gpu_bvh_persistent           8.12        24.27       1532.4     120.2x
+
+>>> ao dragon --width 1920 --height 1080 --ao 16 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 3
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (282 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 736.2 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 16 AO samples, ~37.3 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                       2679.13      2679.13         13.9           
+gpu_bvh_opt                 20.38        36.27       1831.4     131.5x
+gpu_bvh_persistent          20.16        34.56       1851.7     132.9x
+
+>>> ao dragon --width 1920 --height 1080 --ao 64 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 3
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (306 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 760.9 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 64 AO samples, ~136.9 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                       8748.75      8748.75         15.6           
+gpu_bvh_opt                 86.95       102.63       1574.0     100.6x
+gpu_bvh_persistent          88.61       104.28       1544.6      98.7x
+
+>>> resolution dragon --width 512 --height 512 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 5
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (279 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 748.0 ms (binned SAH, 16 bins, leaf 4)
+Render 512x512, 4 AO samples, ~1.6 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        222.92       222.92          7.1           
+gpu_bvh_opt                  4.76        19.63        330.3      46.8x
+gpu_bvh_persistent           4.89        19.98        321.7      45.6x
+
+>>> resolution dragon --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 5
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (278 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 750.8 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        969.51       969.51         12.8           
+gpu_bvh_opt                  8.62        24.46       1443.1     112.5x
+gpu_bvh_persistent           8.24        24.12       1510.5     117.7x
+
+>>> resolution dragon --width 3840 --height 2160 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --cpu-runs 3
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (274 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 739.6 ms (binned SAH, 16 bins, leaf 4)
+Render 3840x2160, 4 AO samples, ~49.8 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                       3654.51      3654.51         13.6           
+gpu_bvh_opt                 25.19        46.16       1975.3     145.1x
+gpu_bvh_persistent          24.85        45.25       2003.0     147.1x
+
+>>> ablation dragon --width 1920 --height 1080 --ao 4 --mode gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (278 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 755.1 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_naive               19.68        32.99        632.2           
+gpu_bvh_opt                  6.66        21.26       1867.5           
+gpu_bvh_persistent           6.64        21.89       1872.3           
+
+>>> ablation_brute bunny --width 320 --height 240 --ao 4 --mode cpu,gpu_brute,gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (29 ms)
+BVH: 74887 nodes, 37444 leaves, depth 18, built in 54.5 ms (binned SAH, 16 bins, leaf 4)
+Render 320x240, 4 AO samples, ~0.5 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                         38.19        38.19         12.1           
+gpu_brute                 3597.59      3598.99          0.1       0.0x
+gpu_bvh_naive                1.18         2.68        389.5      32.3x
+gpu_bvh_opt                  0.48         2.38        968.7      80.3x
+gpu_bvh_persistent           0.49         2.34        946.9      78.5x
+
+>>> block dragon --width 1920 --height 1080 --ao 4 --mode gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent --block 8x8
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (279 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 753.4 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_naive               24.78        39.26        502.1           
+gpu_bvh_opt                  6.62        21.51       1878.4           
+gpu_bvh_persistent           6.66        21.71       1866.8           
+
+>>> block dragon --width 1920 --height 1080 --ao 4 --mode gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent --block 16x16
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (272 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 739.9 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_naive               24.11        37.98        516.1           
+gpu_bvh_opt                  8.30        24.10       1498.3           
+gpu_bvh_persistent           8.14        24.13       1528.1           
+
+>>> block dragon --width 1920 --height 1080 --ao 4 --mode gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent --block 32x8
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (278 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 752.1 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_naive               21.51        35.28        578.4           
+gpu_bvh_opt                  6.96        21.69       1786.7           
+gpu_bvh_persistent           6.67        21.49       1865.9           
+
+>>> block dragon --width 1920 --height 1080 --ao 4 --mode gpu_bvh_naive,gpu_bvh_opt,gpu_bvh_persistent --block 32x32
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (283 ms)
+BVH: 959001 nodes, 479501 leaves, depth 26, built in 754.6 ms (binned SAH, 16 bins, leaf 4)
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_naive               25.59        39.76        486.2           
+gpu_bvh_opt                  8.56        24.41       1453.5           
+gpu_bvh_persistent           8.18        24.13       1521.9           
+
+wrote results\results.csv; plot with: py scripts\plot_results.py

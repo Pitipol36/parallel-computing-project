@@ -1,0 +1,22 @@
+<section id="sequential" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Sequential solution: a SAH BVH</h2>
+<div style="display:flex;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:24px">
+<p style="font-size:32px;line-height:1.45;color:#4A5263">A <b>bounding volume hierarchy</b> nests boxes around groups of triangles. A ray skips every box it misses, so it tests only a few dozen triangles instead of all of them.</p>
+<p style="font-size:32px;line-height:1.45;color:#4A5263">The <b>Surface Area Heuristic</b> picks each split to minimise the expected traversal cost. Binning (16 bins per axis) keeps the build at O(T log T).</p>
+</div>
+<div style="width:720px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px;background:#F1F0EC;padding:40px;border-radius:16px">
+<p style="font-size:24px;color:#6B7280">brute force</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:44px;font-weight:600;color:#10172A">O(P · T)</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;background:#10172A;padding:40px;border-radius:16px">
+<p style="font-size:24px;color:#C9D1E0">with a BVH (P rays, T triangles)</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:44px;font-weight:600;color:#F28A5E">O(P log T) + O(T log T)</p>
+</div>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">Measured on the bunny at 320×240: brute force on the GPU takes 3.6 s; the BVH on <b>one CPU core</b> takes 38 ms.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">4 · BVH ray tracing on CUDA</p>
+<aside>The sequential algorithm is a bounding volume hierarchy built with the Surface Area Heuristic. Brute force costs rays times triangles. A BVH brings each ray down to about log T, plus a one-off T log T build. SAH is the standard quality measure used in PBRT and the literature, and binning gives near full-SAH quality while keeping the build fast. The number at the bottom is the key point: brute force on the GPU is a hundred times slower than the BVH on a single CPU core. Algorithm first, then parallelism.</aside>
+</section>

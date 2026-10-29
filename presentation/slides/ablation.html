@@ -1,0 +1,11 @@
+<section id="ablation" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Ablation: what each optimization buys</h2>
+<img src="/_blob/20d9e1d3c663b9825f36bdd760cd9d0a" alt="Bar charts. Dragon 1080p: naive 632, opt 1868, persistent 1872 million rays per second. Bunny 320x240 log scale: CPU 12, brute force 0.1, naive 390, opt 969, persistent 947 million rays per second" style="width:1486px;height:520px;object-fit:contain">
+<div style="display:flex;gap:48px">
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233"><b>Algorithm:</b> brute force 3.6 s vs BVH 0.48 ms (7,500×)</p>
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233"><b>Memory layout:</b> naive → opt is 3.0× faster</p>
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233"><b>Persistent threads:</b> no measurable gain on Turing</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">12 · Left: dragon, 1920×1080, 4 AO. Right: bunny, 320×240, 4 AO (log scale)</p>
+<aside>The ablation separates the contributions. The biggest win by far is the algorithm: brute force on the GPU is 7,500 times slower than the BVH, and even slower than the BVH on one CPU core. Next is memory layout: aligned float4 loads through the read-only cache, the inverse direction and ordered traversal make the BVH kernel three times faster than the naive layout. Persistent threads gave no measurable gain. On Turing the hardware block scheduler already balances cheap and expensive pixels well; the classic Aila and Laine results were on older GPUs.</aside>
+</section>

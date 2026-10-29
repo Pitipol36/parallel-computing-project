@@ -1,0 +1,8 @@
+build/
+data/*
+!data/.gitkeep
+*.ply
+*.tar.gz
+renders/verify_*
+__pycache__/
+.vs/

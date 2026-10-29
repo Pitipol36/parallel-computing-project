@@ -1,0 +1,10 @@
+<section id="scaling" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Speedup vs ray workload</h2>
+<div style="display:flex;gap:64px">
+<img src="/_blob/dde2155eda13fc27db3ba1741832e982" alt="Line chart: gpu_bvh_opt kernel speedup rises from 47x at 512x512 to 113x at 1080p and 145x at 4K; end-to-end speedup rises from 11x to 79x" style="width:800px;height:480px;object-fit:contain">
+<img src="/_blob/d35b41ac6f89db8b2f5d7c21670caaf4" alt="Line chart: speedup on the dragon at 1080p stays between 88x and 133x for 0 to 64 AO samples; end-to-end speedup rises with more AO samples" style="width:800px;height:480px;object-fit:contain">
+</div>
+<p style="font-size:32px;line-height:1.4;color:#1B2233;width:1500px">The gap <b>widens with more rays</b>: 47× at 512² to <b>145× at 4K</b>. The GPU needs many rays in flight to hide memory latency, and the fixed upload cost is shared by more pixels (end to end 11× → 79×).</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">11 · Dragon (871K triangles); left 4 AO; right 1080p. Repeated runs vary by about ±25 %.</p>
+<aside>This is where the expected trend does show up: as the number of rays grows, so does the GPU’s lead. At 512 by 512 the GPU is 47 times faster; at 4K it is 145 times faster. With few rays the GPU cannot keep enough warps busy to hide memory latency, and end to end the fixed upload cost dominates. With more AO samples the picture is similar, but noisier: the desktop had background programs using the GPU, so repeated runs of the same setting varied by about 25 percent, and I would not read too much into the dip at 4 AO.</aside>
+</section>

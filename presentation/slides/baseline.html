@@ -1,0 +1,31 @@
+<section id="baseline" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Why it is the best sequential version</h2>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px">
+<div style="display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:40px;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Binned SAH build</h3>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">the accepted standard for BVH quality, leaves of about 4 triangles</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:40px;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">32-byte flat nodes</h3>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">depth-first layout, left child implicit, two cache-friendly float4s</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:40px;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Ordered traversal</h3>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">nearer child first; skip subtrees beyond the closest hit so far</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:40px;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Precomputed data</h3>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">triangle edges for Möller–Trumbore, inverse ray direction for the slab test</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:40px;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Any-hit early exit</h3>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">shadow and AO rays stop at the first hit within range</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;background:#10172A;padding:40px;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#F3F4F1">Tuned for one core</h3>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">/O2 /arch:AVX2; swapping MSVC’s library fminf for compare-select made it 6× faster</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">5 · “Best” means the best known acceleration structure with single-ray traversal, deliberately single-threaded</p>
+<aside>The assignment compares sequential against parallel, so the baseline has to be as good as I can make a single thread. It uses the standard acceleration structure, a cache-friendly 32-byte node layout, ordered traversal with early termination, and precomputed triangle edges and inverse directions. One finding: MSVC compiles fminf into a library call, and replacing it with a simple compare-select made the CPU render and the BVH build about six times faster. Being honest about scope: SIMD packet tracing or wide BVHs would be faster still, but that is a different algorithm.</aside>
+</section>

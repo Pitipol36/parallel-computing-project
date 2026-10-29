@@ -1,0 +1,29 @@
+<section id="correctness" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Correctness: the same image, pixel for pixel</h2>
+<div style="display:flex;gap:32px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<img src="/_blob/91ff7b04a503fbbd973c96af3e8449c5" alt="Dragon rendered by the single-threaded CPU in 1.19 s" style="width:560px;height:420px;object-fit:cover;border-radius:16px">
+<p style="font-size:24px;color:#4A5263"><b>CPU</b>, 1 thread · 1,193 ms</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<img src="/_blob/1e832df171d18887f07a4b735209c81f" alt="The same dragon rendered by gpu_bvh_opt in 13.8 ms" style="width:560px;height:420px;object-fit:cover;border-radius:16px">
+<p style="font-size:24px;color:#4A5263"><b>GPU</b>, gpu_bvh_opt · 13.8 ms</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:44px;font-weight:700;color:#2A78D6">0.0016 %</p>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">hit triangle IDs that differ on the dragon (5 of 307,200 pixels, all on triangle edges)</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:44px;font-weight:700;color:#2A78D6">57.6 dB</p>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">PSNR vs the CPU; test scene is bit-identical</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:44px;font-weight:700;color:#2A78D6">44 / 44</p>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">unit tests pass; BVH validated</p>
+</div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">8 · raytracer --verify, 640×480, 4 AO; images at 960×720, 16 AO; no fast-math</p>
+<aside>Correctness is checked automatically with a --verify flag. For every pixel, the primary ray must hit the same triangle ID on the CPU and GPU. On the dragon only 5 of 307 thousand pixels differ, and those sit exactly on triangle edges, where the GPU’s fused multiply-add rounds differently. Ties at equal distance go to the smaller triangle index, so traversal order never changes the answer. The images match at 57.6 dB, and the procedural test scene is bit-identical. There are also 44 unit tests for ray-triangle and ray-box cases, BVH against brute force, and PLY loading.</aside>
+</section>

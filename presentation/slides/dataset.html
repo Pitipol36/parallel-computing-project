@@ -1,0 +1,22 @@
+<section id="dataset" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Dataset: Stanford 3D scans</h2>
+<div style="display:flex;gap:40px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<img src="/_blob/90cbef1e28ea5ce14318bf4b18e24256" alt="Stanford bunny render" style="width:528px;height:440px;object-fit:cover;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Bunny · 69K triangles</h3>
+<p style="font-size:24px;color:#4A5263">development and correctness</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<img src="/_blob/fb93a080a7923058f39c38956f2255de" alt="Stanford dragon render" style="width:528px;height:440px;object-fit:cover;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Dragon · 871K triangles</h3>
+<p style="font-size:24px;color:#4A5263">main benchmark model</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<img src="/_blob/b97bf853bd22be98a08e7a0ccc865e26" alt="Happy Buddha render" style="width:528px;height:440px;object-fit:cover;border-radius:16px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Happy Buddha · 1.09M</h3>
+<p style="font-size:24px;color:#4A5263">largest model in the results</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">3 · Stanford 3D Scanning Repository, original PLY files. Lucy (28M) was unreachable, so Buddha is the largest model.</p>
+<aside>The models come from the Stanford 3D Scanning Repository, a standard public dataset in graphics research. The bunny is small and good for development. The dragon, at 871 thousand triangles, is the main benchmark model. The Happy Buddha, at 1.09 million, is the largest one I could use: Stanford’s server, which is the only source for the 28-million-triangle Lucy, could not be reached, so the plan’s fallback applies. There is also a small procedural sphere-on-ground scene for unit tests, so tests never need a download.</aside>
+</section>

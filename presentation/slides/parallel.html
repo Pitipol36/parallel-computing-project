@@ -1,0 +1,40 @@
+<section id="parallel" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Parallel design: one thread per pixel</h2>
+<div style="display:flex;align-items:center;gap:24px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:32px;border-radius:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#6B7280">CPU</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Load PLY, build SAH BVH</h3>
+</div>
+<x-shape kind="arrow-right" style="background:#2A78D6;width:56px;height:28px"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:32px;border-radius:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#6B7280">PCIe</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Upload nodes and triangles</h3>
+</div>
+<x-shape kind="arrow-right" style="background:#2A78D6;width:56px;height:28px"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#10172A;padding:32px;border-radius:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F28A5E">GPU</p>
+<h3 style="font-size:32px;font-weight:600;color:#F3F4F1">Each thread traces 2 + N rays</h3>
+</div>
+<x-shape kind="arrow-right" style="background:#2A78D6;width:56px;height:28px"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:32px;border-radius:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#6B7280">PCIe</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Download the image</h3>
+</div>
+</div>
+<div style="display:flex;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Same code on both sides</h3>
+<p style="font-size:24px;line-height:1.45;color:#4A5263">Ray, box, triangle, traversal and shading are written once as __host__ __device__. The CPU and the optimized kernel run literally the same functions.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Identical rays</h3>
+<p style="font-size:24px;line-height:1.45;color:#4A5263">A PCG hash of (pixel, sample) seeds each AO ray, sampled without sin/cos, so the CPU and GPU generate bit-identical directions.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:32px;font-weight:600;color:#10172A">No communication</h3>
+<p style="font-size:24px;line-height:1.45;color:#4A5263">Rays are independent. The costs are warp divergence (different tree paths) and irregular memory access.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">6 · BVH ray tracing on CUDA</p>
+<aside>The BVH is built once on the CPU with the same code as the baseline and uploaded, so both versions do identical work per ray and only the execution model differs. On the GPU, each thread owns one pixel and traces its primary, shadow and AO rays with its own small stack. To make the comparison checkable, the math is shared host-device code and the random numbers are a deterministic hash, so the CPU and GPU shoot exactly the same rays. The interesting GPU costs are divergence, because neighbouring threads take different paths through the tree, and scattered memory reads.</aside>
+</section>

@@ -1,0 +1,13 @@
+<section id="kernels" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Four kernels, one change at a time</h2>
+<table style="font-size:28px;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif">
+<tr><th style="width:24%">Kernel</th><th style="width:52%">What it does</th><th style="width:24%;text-align:right">Dragon, 1080p</th></tr>
+<tr><td>gpu_brute</td><td>every ray tests every triangle</td><td style="text-align:right">bunny only</td></tr>
+<tr><td>gpu_bvh_naive</td><td>same BVH; 40-byte struct nodes, indexed vertices, plain loads, a division per box test</td><td style="text-align:right">19.7 ms</td></tr>
+<tr style="background:#EAF1FB"><td><b>gpu_bvh_opt</b></td><td>float4 nodes and triangles via __ldg, inverse direction, nearer child first</td><td style="text-align:right"><b>6.7 ms</b></td></tr>
+<tr><td>gpu_bvh_persistent</td><td>opt traversal; GPU-filling warps pull 8×4 pixel tiles from an atomicAdd counter</td><td style="text-align:right">6.6 ms</td></tr>
+</table>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">Each version targets one bottleneck: algorithm, memory layout and access, then load imbalance. Brute-force launches run in 8-row strips to stay under the Windows 2 s watchdog.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">7 · Kernel times: median of 5 runs, 4 AO samples, RTX 2060</p>
+<aside>For the ablation study there are four kernels behind a command-line flag. Brute force shows that the algorithm matters more than raw parallelism. The naive BVH kernel uses the same tree but a plain array-of-structs layout. The optimized kernel uses aligned float4 loads through the read-only cache, a precomputed inverse direction and nearer-child-first ordering. The persistent-threads kernel launches only enough warps to fill the GPU and lets them grab tiles from a global counter, which targets the imbalance between cheap background pixels and expensive geometry pixels.</aside>
+</section>

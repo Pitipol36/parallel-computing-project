@@ -1,0 +1,13 @@
+<section id="breakdown" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Where the time goes</h2>
+<div style="display:flex;gap:64px">
+<img src="/_blob/4bc870d577acc734fcd24f67351ddb75" alt="Stacked bars: BVH build on the CPU takes 57 to 922 ms and dominates; upload, kernel and download together are under 30 ms" style="width:800px;height:480px;object-fit:contain">
+<img src="/_blob/6adf471cedc6c78c248c4b0a81fa62f7" alt="Bar chart: kernel time by block size; 8x8 and 32x8 are slightly faster than 16x16 and 32x32 for the BVH kernels" style="width:800px;height:480px;object-fit:contain">
+</div>
+<div style="display:flex;gap:64px">
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233">The CPU <b>BVH build</b> (0.9 s on the Buddha) now takes longer than upload + render + download.</p>
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233">Small or wide blocks (8×8, 32×8) win slightly: nearby pixels trace more coherent paths.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">13 · 1920×1080, 4 AO; block sizes measured on the dragon</p>
+<aside>Two more observations. On the left, once the render takes only a few milliseconds, the single-threaded BVH build on the CPU becomes the biggest cost by far: almost a second on the Buddha, against under 30 milliseconds for upload, kernel and download combined. On the right, block-size tuning: 8 by 8 and 32 by 8 are a little faster than 16 by 16 or 32 by 32, because pixels close together in a block take similar paths through the tree, which means less divergence.</aside>
+</section>

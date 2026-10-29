@@ -1,0 +1,28 @@
+<section id="problem" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">The problem: millions of ray queries</h2>
+<p style="font-size:32px;line-height:1.45;color:#4A5263;width:1400px">Every pixel shoots rays into a scanned mesh, and each ray must find its closest (or any) hit among up to a million triangles.</p>
+<div style="display:flex;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:40px;border-radius:16px">
+<p style="font-size:72px;font-weight:700;color:#2A78D6;line-height:1.1">1</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">primary ray</h3>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">closest hit: which triangle does this pixel see?</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:40px;border-radius:16px">
+<p style="font-size:72px;font-weight:700;color:#2A78D6;line-height:1.1">1</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">shadow ray</h3>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">any hit toward the light: is the point lit?</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#F1F0EC;padding:40px;border-radius:16px">
+<p style="font-size:72px;font-weight:700;color:#2A78D6;line-height:1.1">N</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">ambient-occlusion rays</h3>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">any hit nearby: how enclosed is the point?</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#10172A;padding:40px;border-radius:16px">
+<p style="font-size:72px;font-weight:700;color:#F28A5E;line-height:1.1">12.4M</p>
+<h3 style="font-size:32px;font-weight:600;color:#F3F4F1">rays per frame</h3>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">at 1920×1080 with 4 AO samples</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">2 · BVH ray tracing on CUDA</p>
+<aside>Each pixel needs a primary ray to find what it sees, a shadow ray toward the light, and N ambient-occlusion rays that test how enclosed the surface is. At full HD with 4 AO samples that is about 12 million rays per frame. Every ray is independent, so there is a lot of data parallelism. But each ray walks an irregular tree, which brings warp divergence and scattered memory access. That is a different pattern from the labs: not a stencil, scan or reduction, but hierarchical tree traversal.</aside>
+</section>
