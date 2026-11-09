@@ -18,6 +18,6 @@
 <p style="font-size:24px;line-height:1.45;color:#4A5263">Nsight Compute on registers, occupancy and local-memory stack traffic; benchmark on an idle GPU.</p>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">16 · BVH ray tracing on CUDA</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">17 ·BVH ray tracing on CUDA</p>
 <aside>A few limitations and next steps. The BVH build is single-threaded on the CPU and now dominates total time, so a GPU LBVH built with Morton codes, sorting and scan is the clear next step. Sorting AO rays by direction would make warps more coherent. I could not get the 28-million-triangle Lucy model, which would push the memory-bound trend further. And I would profile the traversal in Nsight Compute and rerun the benchmarks on a completely idle GPU to tighten the numbers.</aside>
 </section>

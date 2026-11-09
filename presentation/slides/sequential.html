@@ -17,6 +17,6 @@
 <p style="font-size:24px;line-height:1.4;color:#4A5263">Measured on the bunny at 320×240: brute force on the GPU takes 3.6 s; the BVH on <b>one CPU core</b> takes 38 ms.</p>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">4 · BVH ray tracing on CUDA</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">5 ·BVH ray tracing on CUDA</p>
 <aside>The sequential algorithm is a bounding volume hierarchy built with the Surface Area Heuristic. Brute force costs rays times triangles. A BVH brings each ray down to about log T, plus a one-off T log T build. SAH is the standard quality measure used in PBRT and the literature, and binning gives near full-SAH quality while keeping the build fast. The number at the bottom is the key point: brute force on the GPU is a hundred times slower than the BVH on a single CPU core. Algorithm first, then parallelism.</aside>
 </section>

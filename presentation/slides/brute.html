@@ -1,0 +1,30 @@
+<section id="brute" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Brute force: test every triangle</h2>
+<div style="display:flex;gap:64px">
+<div style="width:860px;display:flex;flex-direction:column;gap:4px;background:#10172A;padding:48px;border-radius:16px;font-family:'JetBrains Mono', 'Courier New', monospace">
+<p style="font-size:28px;line-height:1.5;color:#F3F4F1">for each pixel:</p>
+<p style="font-size:28px;line-height:1.5;color:#F3F4F1">  ray = camera_ray(pixel)</p>
+<p style="font-size:28px;line-height:1.5;color:#F3F4F1">  closest = ∞</p>
+<p style="font-size:28px;line-height:1.5;color:#F3F4F1">  for each triangle: <span style="color:#F28A5E">← all T</span></p>
+<p style="font-size:28px;line-height:1.5;color:#F3F4F1">    t = intersect(ray, tri)</p>
+<p style="font-size:28px;line-height:1.5;color:#F3F4F1">    if t &lt; closest:</p>
+<p style="font-size:28px;line-height:1.5;color:#F3F4F1">      closest = t</p>
+<p style="font-size:28px;line-height:1.5;color:#F3F4F1">  shade(closest)</p>
+<p style="font-size:28px;line-height:1.5;color:#C9D1E0">  shadow + AO rays: same loop,</p>
+<p style="font-size:28px;line-height:1.5;color:#C9D1E0">  stop at the first hit</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:40px">
+<p style="font-size:32px;line-height:1.45;color:#4A5263">Each ray runs a ray–triangle test (Möller–Trumbore) against <b>every</b> triangle and keeps the nearest. Simple and correct, but every ray pays for the whole mesh, hit or not.</p>
+<div style="display:flex;flex-direction:column;gap:8px">
+<p style="font-size:72px;font-weight:700;color:#2A78D6;line-height:1.1">~10¹³</p>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">ray–triangle tests per frame on the dragon at 1080p: up to 12.4M rays × 871K triangles</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<p style="font-size:72px;font-weight:700;color:#EB6834;line-height:1.1">3.6 s</p>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">to render the 69K-triangle bunny at 320×240, even on the GPU</p>
+</div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">4 · Cost O(P · T) for P rays and T triangles. This is the loop from my earlier RT-Project, at a much bigger scale.</p>
+<aside>First, the obvious way. For each pixel we make a camera ray, then loop over every triangle in the mesh, run a ray–triangle intersection test, and keep the closest hit. Shadow and ambient-occlusion rays use the same loop but can stop at the first hit. It’s simple and always correct, and it’s exactly what my old Python ray tracer did. The problem is cost: rays times triangles. On the dragon at full HD that’s up to 12 million rays times 871 thousand triangles, about ten to the thirteen tests per frame. Even on the GPU, the 69-thousand-triangle bunny at a tiny 320 by 240 takes 3.6 seconds. So before parallelising anything, we need a better algorithm.</aside>
+</section>

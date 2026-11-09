@@ -54,6 +54,6 @@
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">5 · Dragon: 959K nodes, 480K leaves, depth 26, built in 0.8 s on one core</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">6 ·Dragon: 959K nodes, 480K leaves, depth 26, built in 0.8 s on one core</p>
 <aside>Here is a small example: twelve triangles. The root box holds everything. We split the triangles into two groups, A and B, and put a tight box around each, then split again until each leaf holds a few triangles. Notice we split the triangles, not the space: boxes can overlap, like the two inside B, but each triangle is in exactly one leaf. To choose a split we use the Surface Area Heuristic. A ray that hits the parent box hits a child box with probability about equal to the child’s surface area share, so this formula is the expected cost of a split. We drop triangle centres into 16 bins per axis, score the 15 planes between them, and keep the cheapest, or stop and make a leaf if splitting doesn’t pay. For the dragon this gives 959 thousand nodes, 26 levels deep, built in under a second.</aside>
 </section>

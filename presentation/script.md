@@ -8,13 +8,13 @@ facts only you know, so fill them in before rehearsing.
 |---|---|---|
 | Why this topic | 1 | 1:30 |
 | The problem and the data | 2–3 | 1:00 |
-| BVH in depth | 4–7 | 3:45 |
-| Parallel design and kernels | 8–9 | 1:45 |
-| Correctness | 10 | 0:40 |
-| Results | 11–15 | 2:45 |
-| Wrap-up | 16–17 | 0:35 |
+| Brute force and the BVH in depth | 4–8 | 4:10 |
+| Parallel design and kernels | 9–10 | 1:55 |
+| Correctness | 11 | 0:40 |
+| Results | 12–16 | 2:45 |
+| Wrap-up | 17–18 | 0:35 |
 
-If you run long, shorten the results section (slides 14–15), not the BVH section.
+If you run long, shorten the results section (slides 15–16), not the BVH section.
 
 ---
 
@@ -60,20 +60,28 @@ as the main benchmark, and the Happy Buddha at 1.09 million triangles as the lar
 28-million-triangle Lucy was only on Stanford’s server, which I couldn’t reach, so the Buddha is
 my biggest model.
 
-## Slide 4: The BVH, in depth (0:50)
+## Slide 4: Brute force (0:35)
+
+*[Point to the loop.]* First, the obvious way. For each pixel, make a camera ray, then loop over
+every triangle, run a ray-triangle test, and keep the closest hit. Shadow and AO rays use the same
+loop but stop at the first hit. It’s simple and always correct, and it’s exactly my RT-Project
+loop.
+
+The problem is the cost: rays times triangles. For the dragon, that’s 12 million rays times 871
+thousand triangles, about ten to the thirteen ray-triangle tests per frame. Even on the GPU, the
+small bunny at 320 by 240 takes 3.6 seconds. So before parallelizing anything, we need a better
+algorithm.
+
+## Slide 5: The BVH, in depth (0:40)
 
 Now the core of the talk: how a BVH works and why it wins.
-
-**The cost of the naive way.** Finding the closest hit naively means testing every triangle:
-rays times triangles. For the dragon, that’s 12 million rays times 871 thousand triangles, about
-ten to the thirteen ray-triangle tests per frame. That’s my RT-Project loop at a much bigger scale.
 
 **The key idea.** If a ray misses a box, it misses everything inside that box. Testing a ray
 against an axis-aligned box is very cheap: a few subtractions and multiplications per axis to find
 where the ray enters and leaves each pair of slabs, then a comparison. So we put boxes around
 groups of triangles, and when a ray misses a box, one cheap test rules out thousands of triangles.
 
-## Slide 5: How a BVH is built (1:30)
+## Slide 6: How a BVH is built (1:30)
 
 *[The diagram: twelve triangles, root, boxes A and B, four leaves; the tree on the right.]*
 
@@ -104,7 +112,7 @@ each axis I drop triangle centres into 16 bins, then sweep once from the left an
 right. That scores all 15 split planes in linear time per node, so the whole build is N log N. The
 dragon builds in about 0.8 seconds on one core.
 
-## Slide 6: How a ray walks the BVH (0:50)
+## Slide 7: How a ray walks the BVH (0:50)
 
 **Traversal.** *[Follow the ray on the diagram, step by step.]* A ray starts at the root and tests both children’s boxes. It goes into the
 *nearer* child first and pushes the farther one on a small stack, along with the distance where it
@@ -114,7 +122,7 @@ closer hit, so we skip it, both when we first meet it and when we pop it from th
 Shadow and AO rays only need *any* hit, not the closest, so they stop at the first triangle they
 hit.
 
-## Slide 7: Why it’s the best sequential version (0:35)
+## Slide 8: Why it’s the best sequential version (0:35)
 
 **Why this is the best sequential version.** SAH is the standard acceleration structure in
 production renderers and research. The nodes are flattened into an array in depth-first order, 32
@@ -132,7 +140,7 @@ built the BVH first and parallelized second.
 And it’s why GPUs now have ray-tracing hardware: NVIDIA’s RT cores walk exactly this kind of tree.
 In this project I wrote the traversal by hand in CUDA, with no ray-tracing libraries.
 
-## Slide 8: Parallel design (1:00)
+## Slide 9: Parallel design (1:00)
 
 So how does it run on the GPU? I build the BVH once on the CPU, with the same code as the
 baseline, and upload it. Then every GPU thread owns one pixel and traces its primary, shadow and
@@ -146,7 +154,7 @@ shoot exactly the same rays.
 There’s no communication between threads. The real costs are divergence, when threads in a warp
 take different paths down the tree, and scattered memory reads.
 
-## Slide 9: Four kernels (0:45)
+## Slide 10: Four kernels (0:55)
 
 To see what each optimization buys, I wrote four kernels. Brute force tests every triangle. The
 naive BVH kernel uses the same tree in a plain struct layout. The optimized kernel uses aligned
@@ -154,7 +162,10 @@ naive BVH kernel uses the same tree in a plain struct layout. The optimized kern
 The persistent-threads kernel launches just enough warps to fill the GPU and has them grab tiles of
 pixels from a global atomic counter.
 
-## Slide 10: Correctness (0:40)
+*[Point to the table.]* On the biggest model, the 1.09-million-triangle Buddha at full HD, the
+optimized kernel takes 8.3 milliseconds; one CPU core takes 937.
+
+## Slide 11: Correctness (0:40)
 
 `--verify` checks that the CPU and GPU agree. For every pixel, the primary ray must hit the
 same triangle. On the dragon, 5 pixels out of 307 thousand differ, all exactly on triangle edges,
@@ -162,44 +173,44 @@ where the GPU’s fused multiply-add rounds differently. The images match at 57.
 scene is bit-identical, and all 44 unit tests pass, including the BVH checked against brute force
 on random rays.
 
-## Slide 11: Headline (0:20)
+## Slide 12: Headline (0:20)
 
 The headline: on every setting I measured, the GPU is **35 to 180 times** faster than the tuned
 single-core version, with the same tree and the same rays.
 
-## Slide 12: Speedup vs mesh size (0:40)
+## Slide 13: Speedup vs mesh size (0:40)
 
 This one surprised me. I expected the gap to grow with mesh size, but it *shrinks*: 182 times on
 the bunny, 113 on the Buddha. The BVH is the reason. It made the CPU’s cost grow only with the log
 of the triangle count. On the GPU, a bigger tree no longer fits in the 3-megabyte L2 cache, so
 threads wait on memory.
 
-## Slide 13: Speedup vs ray workload (0:30)
+## Slide 14: Speedup vs ray workload (0:30)
 
 Where the gap *does* grow is with the number of rays: 47 times at 512 by 512, 145 times at 4K. The
 GPU needs lots of rays in flight to hide memory latency. And end to end, the fixed upload cost gets
 shared by more pixels.
 
-## Slide 14: Ablation (0:40)
+## Slide 15: Ablation (0:40)
 
 Breaking it down: the algorithm is by far the biggest win, with the BVH 7,500 times faster than
 brute force. The memory layout gives another 3 times. Persistent threads gave no measurable gain.
 On this GPU, the hardware scheduler already balances cheap background pixels against expensive
 ones.
 
-## Slide 15: Where the time goes (0:35)
+## Slide 16: Where the time goes (0:35)
 
 Once rendering takes a few milliseconds, the single-threaded BVH build becomes the biggest cost:
 almost a second on the Buddha. And small or wide blocks, like 8 by 8, are slightly faster, because
 nearby pixels take similar paths through the tree.
 
-## Slide 16: Limitations and future work (0:25)
+## Slide 17: Limitations and future work (0:25)
 
 The obvious next step is to build the BVH on the GPU too, with Morton codes, radix sort and scan,
 which are the patterns from our labs. I’d also sort AO rays by direction to cut divergence, and try
 the 28-million-triangle Lucy.
 
-## Slide 17: Questions (0:10)
+## Slide 18: Questions (0:10)
 
 To sum up: going from my ten-sphere Python ray tracer to a million triangles took two steps. A BVH
 made each ray’s search logarithmic, and the GPU ran millions of those searches at once. Thank you,

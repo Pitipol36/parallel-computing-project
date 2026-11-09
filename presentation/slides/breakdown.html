@@ -8,6 +8,6 @@
 <p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233">The CPU <b>BVH build</b> (0.9 s on the Buddha) now takes longer than upload + render + download.</p>
 <p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233">Small or wide blocks (8×8, 32×8) win slightly: nearby pixels trace more coherent paths.</p>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">15 · 1920×1080, 4 AO; block sizes measured on the dragon</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">16 ·1920×1080, 4 AO; block sizes measured on the dragon</p>
 <aside>Two more observations. On the left, once the render takes only a few milliseconds, the single-threaded BVH build on the CPU becomes the biggest cost by far: almost a second on the Buddha, against under 30 milliseconds for upload, kernel and download combined. On the right, block-size tuning: 8 by 8 and 32 by 8 are a little faster than 16 by 16 or 32 by 32, because pixels close together in a block take similar paths through the tree, which means less divergence.</aside>
 </section>

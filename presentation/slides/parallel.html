@@ -35,6 +35,6 @@
 <p style="font-size:24px;line-height:1.45;color:#4A5263">Rays are independent. The costs are warp divergence (different tree paths) and irregular memory access.</p>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">8 · BVH ray tracing on CUDA</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">9 ·BVH ray tracing on CUDA</p>
 <aside>The BVH is built once on the CPU with the same code as the baseline and uploaded, so both versions do identical work per ray and only the execution model differs. On the GPU, each thread owns one pixel and traces its primary, shadow and AO rays with its own small stack. To make the comparison checkable, the math is shared host-device code and the random numbers are a deterministic hash, so the CPU and GPU shoot exactly the same rays. The interesting GPU costs are divergence, because neighbouring threads take different paths through the tree, and scattered memory reads.</aside>
 </section>

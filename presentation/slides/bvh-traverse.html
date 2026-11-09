@@ -59,6 +59,6 @@
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">6 · Farther children wait on a small stack with their entry distance; on pop, any beyond t are dropped</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">7 ·Farther children wait on a small stack with their entry distance; on pop, any beyond t are dropped</p>
 <aside>Now a ray. It starts at the root: hit. It tests both children. It misses B, so B and its six triangles are ruled out with one cheap box test. Inside A it goes into the nearer child first, A2, and finds the closest hit, the orange triangle, at distance t. A1 is pushed on a stack with the distance where the ray would enter it. When we pop it, that distance is beyond t, so A1 can’t contain anything closer and we skip it. In total: five box tests and three triangle tests instead of twelve triangle tests. On the dragon it’s a path about 26 levels deep instead of 871 thousand triangle tests. Shadow and AO rays only need any hit, so they stop at the first one.</aside>
 </section>
