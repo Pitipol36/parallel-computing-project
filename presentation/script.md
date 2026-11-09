@@ -1,7 +1,7 @@
 # Presentation script: BVH Ray Tracing of Large Triangle Meshes on CUDA
 
-About 12 minutes of talking, then Q&A, out of a 15-minute slot. Roughly 1,750 words at a calm
-pace. Lines in *[brackets and italics]* are stage directions. Items in plain `[brackets]` are
+About 12 minutes of talking, then Q&A, out of a 15-minute slot. About 1,800 spoken words, so it
+needs a brisk ~150 words per minute; at a calmer 130 it runs about 14 minutes, so time a rehearsal. Lines in *[brackets and italics]* are stage directions. Items in plain `[brackets]` are
 facts only you know, so fill them in before rehearsing.
 
 | Part | Slides | Time |
