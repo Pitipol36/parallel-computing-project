@@ -1,0 +1,64 @@
+<section id="bvh-traverse" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">How a ray walks the BVH</h2>
+<div style="display:flex;gap:64px">
+<div style="position:relative;width:760px;height:520px">
+<svg aria-label="The same scene with a ray from the bottom entering box A, missing box B entirely, hitting an orange triangle in leaf A2, and passing on into leaf A1, which is greyed out as skipped" width="760" height="520" viewBox="0 0 760 520" style="position:absolute;left:0px;top:0px">
+<rect x="0" y="0" width="760" height="520" rx="16" fill="#F1F0EC"/>
+<rect x="40" y="40" width="680" height="440" fill="none" stroke="#8A8984" stroke-width="3" stroke-dasharray="12 8"/>
+<rect x="60" y="70" width="280" height="390" fill="#2A78D6" fill-opacity="0.06" stroke="#2A78D6" stroke-width="4"/>
+<rect x="72" y="82" width="130" height="160" fill="none" stroke="#B8BCC4" stroke-width="2" stroke-dasharray="8 6"/>
+<rect x="190" y="260" width="140" height="190" fill="#2A78D6" fill-opacity="0.08" stroke="#2A78D6" stroke-width="3"/>
+<rect x="400" y="55" width="300" height="260" fill="none" stroke="#B8BCC4" stroke-width="3"/>
+<rect x="412" y="67" width="140" height="120" fill="none" stroke="#D3D6DB" stroke-width="2" stroke-dasharray="8 6"/>
+<rect x="540" y="150" width="150" height="155" fill="none" stroke="#D3D6DB" stroke-width="2" stroke-dasharray="8 6"/>
+<polygon points="90,100 150,95 110,150" fill="#C9CDD4"/>
+<polygon points="130,160 190,140 170,225" fill="#C9CDD4"/>
+<polygon points="85,180 130,230 80,235" fill="#C9CDD4"/>
+<polygon points="250,330 300,345 260,380" fill="#EB6834"/>
+<polygon points="290,275 325,285 300,310" fill="#4A5263"/>
+<polygon points="200,400 240,410 205,440" fill="#4A5263"/>
+<polygon points="420,80 480,75 440,130" fill="#D3D6DB"/>
+<polygon points="470,120 540,110 520,175" fill="#D3D6DB"/>
+<polygon points="430,150 465,170 425,180" fill="#D3D6DB"/>
+<polygon points="560,170 640,160 590,230" fill="#D3D6DB"/>
+<polygon points="620,230 680,250 640,295" fill="#D3D6DB"/>
+<polygon points="555,250 600,262 565,295" fill="#D3D6DB"/>
+<line x1="270" y1="351" x2="100" y2="120" stroke="#10172A" stroke-opacity="0.35" stroke-width="3" stroke-dasharray="10 8"/>
+<line x1="380" y1="500" x2="270" y2="351" stroke="#10172A" stroke-width="4" stroke-linecap="round"/>
+<circle cx="380" cy="500" r="8" fill="#10172A"/>
+<circle cx="270" cy="351" r="9" fill="#EB6834" stroke="#FCFCFB" stroke-width="3"/>
+</svg>
+<p style="position:absolute;left:396px;top:482px;width:80px;font-size:24px;color:#10172A">ray</p>
+<p style="position:absolute;left:630px;top:434px;width:80px;font-size:24px;color:#6B7280">root</p>
+<p style="position:absolute;left:74px;top:412px;width:40px;font-size:28px;font-weight:700;color:#2A78D6">A</p>
+<p style="position:absolute;left:414px;top:326px;width:160px;font-size:24px;color:#6B7280">B · missed</p>
+<p style="position:absolute;left:214px;top:150px;width:120px;font-size:24px;line-height:1.3;color:#6B7280">A1 skipped</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;gap:20px;align-items:start">
+<p style="width:48px;height:48px;font-size:26px;font-weight:700;line-height:48px;text-align:center;background:#2A78D6;color:#FCFCFB;border-radius:50%">1</p>
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233">Test the root box: hit.</p>
+</div>
+<div style="display:flex;gap:20px;align-items:start">
+<p style="width:48px;height:48px;font-size:26px;font-weight:700;line-height:48px;text-align:center;background:#2A78D6;color:#FCFCFB;border-radius:50%">2</p>
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233">Test A and B. The ray misses B, so B’s 6 triangles are never touched.</p>
+</div>
+<div style="display:flex;gap:20px;align-items:start">
+<p style="width:48px;height:48px;font-size:26px;font-weight:700;line-height:48px;text-align:center;background:#2A78D6;color:#FCFCFB;border-radius:50%">3</p>
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233">Enter A’s <b>nearer</b> child, A2, and test its 3 triangles: closest hit at distance t (orange).</p>
+</div>
+<div style="display:flex;gap:20px;align-items:start">
+<p style="width:48px;height:48px;font-size:26px;font-weight:700;line-height:48px;text-align:center;background:#2A78D6;color:#FCFCFB;border-radius:50%">4</p>
+<p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233">A1 starts beyond t, so it can’t hold a closer hit: skip it.</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;background:#10172A;padding:32px;border-radius:16px">
+<p style="font-size:32px;font-weight:600;line-height:1.3;color:#F3F4F1">5 box tests + 3 triangle tests, not 12</p>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">Dragon: a path ~26 levels deep instead of 871,414 triangle tests. Shadow and AO rays stop at the first hit.</p>
+</div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">6 · Farther children wait on a small stack with their entry distance; on pop, any beyond t are dropped</p>
+<aside>Now a ray. It starts at the root: hit. It tests both children. It misses B, so B and its six triangles are ruled out with one cheap box test. Inside A it goes into the nearer child first, A2, and finds the closest hit, the orange triangle, at distance t. A1 is pushed on a stack with the distance where the ray would enter it. When we pop it, that distance is beyond t, so A1 can’t contain anything closer and we skip it. In total: five box tests and three triangle tests instead of twelve triangle tests. On the dragon it’s a path about 26 levels deep instead of 871 thousand triangle tests. Shadow and AO rays only need any hit, so they stop at the first one.</aside>
+</section>

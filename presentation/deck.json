@@ -3,7 +3,7 @@
   "createdOnFiles": {"v": 1, "at": "2026-10-29T18:00:00Z"},
   "lists": "css",
   "title": "BVH Ray Tracing of Large Triangle Meshes on CUDA",
-  "order": ["cover", "problem", "dataset", "sequential", "baseline", "parallel", "kernels", "correctness", "headline", "size", "scaling", "ablation", "breakdown", "limits", "qa"],
+  "order": ["cover", "problem", "dataset", "sequential", "bvh-build", "bvh-traverse", "baseline", "parallel", "kernels", "correctness", "headline", "size", "scaling", "ablation", "breakdown", "limits", "qa"],
   "sections": {
     "intro": {"description": "The problem and the dataset", "start": "cover"},
     "seq": {"description": "The sequential solution and why it is the best sequential version", "start": "sequential"},

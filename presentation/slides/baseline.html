@@ -26,6 +26,6 @@
 <p style="font-size:24px;line-height:1.4;color:#C9D1E0">/O2 /arch:AVX2; swapping MSVC’s library fminf for compare-select made it 6× faster</p>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">5 · “Best” means the best known acceleration structure with single-ray traversal, deliberately single-threaded</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">7 · “Best” means the best known acceleration structure with single-ray traversal, deliberately single-threaded</p>
 <aside>The assignment compares sequential against parallel, so the baseline has to be as good as I can make a single thread. It uses the standard acceleration structure, a cache-friendly 32-byte node layout, ordered traversal with early termination, and precomputed triangle edges and inverse directions. One finding: MSVC compiles fminf into a library call, and replacing it with a simple compare-select made the CPU render and the BVH build about six times faster. Being honest about scope: SIMD packet tracing or wide BVHs would be faster still, but that is a different algorithm.</aside>
 </section>

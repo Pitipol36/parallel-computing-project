@@ -6,6 +6,6 @@
 <p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233"><b>Memory layout:</b> naive → opt is 3.0× faster</p>
 <p style="flex:1;font-size:28px;line-height:1.4;color:#1B2233"><b>Persistent threads:</b> no measurable gain on Turing</p>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">12 · Left: dragon, 1920×1080, 4 AO. Right: bunny, 320×240, 4 AO (log scale)</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">14 · Left: dragon, 1920×1080, 4 AO. Right: bunny, 320×240, 4 AO (log scale)</p>
 <aside>The ablation separates the contributions. The biggest win by far is the algorithm: brute force on the GPU is 7,500 times slower than the BVH, and even slower than the BVH on one CPU core. Next is memory layout: aligned float4 loads through the read-only cache, the inverse direction and ordered traversal make the BVH kernel three times faster than the naive layout. Persistent threads gave no measurable gain. On Turing the hardware block scheduler already balances cheap and expensive pixels well; the classic Aila and Laine results were on older GPUs.</aside>
 </section>

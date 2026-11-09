@@ -24,6 +24,6 @@
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">8 · raytracer --verify, 640×480, 4 AO; images at 960×720, 16 AO; no fast-math</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">10 · raytracer --verify, 640×480, 4 AO; images at 960×720, 16 AO; no fast-math</p>
 <aside>Correctness is checked automatically with a --verify flag. For every pixel, the primary ray must hit the same triangle ID on the CPU and GPU. On the dragon only 5 of 307 thousand pixels differ, and those sit exactly on triangle edges, where the GPU’s fused multiply-add rounds differently. Ties at equal distance go to the smaller triangle index, so traversal order never changes the answer. The images match at 57.6 dB, and the procedural test scene is bit-identical. There are also 44 unit tests for ray-triangle and ray-box cases, BVH against brute force, and PLY loading.</aside>
 </section>
