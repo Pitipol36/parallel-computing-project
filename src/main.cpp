@@ -85,7 +85,7 @@ void usage() {
         "  --stats-csv FILE    append traversal counters per mode (RT_TRAVERSAL_STATS builds only)\n"
         "  --dynamic           exploding-mesh animation; per frame compares a cpu_sah rebuild, a\n"
         "                      gpu_lbvh rebuild, a refit of the frame-0 gpu_lbvh tree and a\n"
-        "                      gpu_ploc rebuild\n"
+        "                      gpu_ploc and a gpu_trbvh rebuild\n"
         "  --frames N          frames for --dynamic (default 60)\n"
         "  --dynamic-csv FILE  per-frame rows for --dynamic (default results/dynamic.csv); with\n"
         "                      --out, every frame of the gpu_lbvh render is written as PNG\n"
@@ -378,7 +378,7 @@ int run_build_bench(const Options& o) {
     if (!exists) {
         csv << "experiment,model,tris,builder,leaf,runs,build_ms,upload_ms,download_ms";
         for (const char* s : stageNames) csv << "," << s << "_ms";
-        csv << ",sah_cost,nodes,leaves,max_depth,avg_leaf,ploc_radius,iterations,trbvh_passes\n";
+        csv << ",sah_cost,nodes,leaves,max_depth,avg_leaf,ploc_radius,iterations,trbvh_passes,trbvh_treelet,trbvh_warp\n";
     }
     std::printf("%-10s %10s %10s %10s %8s %8s %6s\n", "builder", "build ms", "upload ms", "SAH cost", "depth", "leaves",
                 "iters");
@@ -424,7 +424,9 @@ int run_build_bench(const Options& o) {
         csv << "," << ts.sahCost << "," << ts.nodes << "," << ts.leaves << "," << ts.maxDepth << ","
             << ts.avgLeafSize << "," << (ploc ? std::to_string(o.bp.plocRadius) : "") << ","
             << (ploc ? std::to_string(iterations) : "") << ","
-            << (trbvh ? std::to_string(o.bp.trbvhPasses) : "") << "\n";
+            << (trbvh ? std::to_string(o.bp.trbvhPasses) : "") << ","
+            << (trbvh ? std::to_string(o.bp.trbvhTreelet) : "") << ","
+            << (trbvh ? (o.bp.trbvhWarp ? "1" : "0") : "") << "\n";
     }
     return failures ? 1 : 0;
 }
@@ -465,19 +467,20 @@ int run_dynamic(const Options& o) {
 
     std::printf("Dynamic scene: %s exploding, %d triangles, %d frames, %dx%d, %d AO\n", label.c_str(), n, o.frames,
                 rp.width, rp.height, rp.aoSamples);
-    constexpr int NV = 4;
-    std::printf("%5s %6s | %-28s | %-28s | %-28s | %-28s\n", "frame", "t", "cpu_sah rebuild (upd+render)",
-                "gpu_lbvh rebuild", "gpu refit", "gpu_ploc rebuild");
-    GpuLbvhBuilder rebuilder, refitter;
+    constexpr int NV = 5;
+    std::printf("%5s %6s | %-28s | %-28s | %-28s | %-28s | %-28s\n", "frame", "t", "cpu_sah rebuild (upd+render)",
+                "gpu_lbvh rebuild", "gpu refit", "gpu_ploc rebuild", "gpu_trbvh rebuild");
+    GpuLbvhBuilder rebuilder, refitter, trbvh;
     GpuPlocBuilder ploc;
-    if (!rebuilder.reserve(n, err) || !refitter.reserve(n, err) || !ploc.reserve(n, err)) {
+    if (!rebuilder.reserve(n, err) || !refitter.reserve(n, err) || !ploc.reserve(n, err) || !trbvh.reserve(n, err)) {
         std::fprintf(stderr, "%s\n", err.c_str());
         return 1;
     }
     std::vector<vec3> verts;
     struct Sum { double total = 0; double sah = 0; };
     Sum sums[NV];
-    const char* names[NV] = {"cpu_sah_rebuild", "gpu_lbvh_rebuild", "gpu_refit", "gpu_ploc_rebuild"};
+    const char* names[NV] = {"cpu_sah_rebuild", "gpu_lbvh_rebuild", "gpu_refit", "gpu_ploc_rebuild",
+                             "gpu_trbvh_rebuild"};
     // Warm-up of every path at t = 0 (first CUDA calls, CUB, allocations), not recorded.
     {
         BuildReport r;
@@ -486,6 +489,7 @@ int run_dynamic(const Options& o) {
         rebuilder.build(dVerts, dFaces, n, o.bp, &r, err);
         render_gpu_resident(rebuilder.tree(), GpuMode::BvhOpt, sp, o.launch, px, nullptr, tm, err);
         ploc.build(dVerts, dFaces, n, o.bp, &r, err);
+        trbvh.build(dVerts, dFaces, n, o.bp, &r, err, true);
     }
     for (int f = 0; f < o.frames; ++f) {
         const float t = float(f) / float(o.frames - 1);
@@ -547,6 +551,19 @@ int run_dynamic(const Options& o) {
             ploc.download(host, err);
             upd[3] = r.buildMs; ren[3] = tm.e2eMs; sah[3] = tree_stats(host).sahCost; anim[3] = animMs;
         }
+        // gpu_trbvh: LBVH + treelet restructuring on the device, render the resident tree.
+        {
+            BuildReport r;
+            GpuTimings tm;
+            BVH host;
+            if (!trbvh.build(dVerts, dFaces, n, o.bp, &r, err, true) ||
+                !render_gpu_resident(trbvh.tree(), GpuMode::BvhOpt, sp, o.launch, pixels, nullptr, tm, err)) {
+                std::fprintf(stderr, "gpu_trbvh frame %d: %s\n", f, err.c_str());
+                return 1;
+            }
+            trbvh.download(host, err);
+            upd[4] = r.buildMs; ren[4] = tm.e2eMs; sah[4] = tree_stats(host).sahCost; anim[4] = animMs;
+        }
         // cpu_sah: animate and rebuild on the CPU, upload the tree, render.
         {
             auto ta = Clock::now();
@@ -571,7 +588,8 @@ int run_dynamic(const Options& o) {
                 << t << "," << names[v] << "," << anim[v] << "," << upd[v] << "," << ren[v] << "," << totals[v] << ","
                 << sah[v] << "\n";
         }
-        std::printf("%5d %6.3f | %-28s | %-28s | %-28s | %-28s\n", f, t, cell[0], cell[1], cell[2], cell[3]);
+        std::printf("%5d %6.3f | %-28s | %-28s | %-28s | %-28s | %-28s\n", f, t, cell[0], cell[1], cell[2], cell[3],
+                    cell[4]);
     }
     std::printf("\nmean per frame (update + render, animation excluded):\n");
     for (int v = 0; v < NV; ++v)

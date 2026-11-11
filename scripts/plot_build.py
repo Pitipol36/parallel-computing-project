@@ -18,17 +18,19 @@ RES = os.path.join(ROOT, "results")
 OUT = os.path.join(RES, "plots")
 
 COLORS = {"cpu_sah": "#52514e", "cpu_lbvh": "#eb6834", "gpu_lbvh": "#2a78d6", "cpu_ploc": "#7a5bd6",
-          "gpu_ploc": "#1baf7a", "gpu_refit": "#eda100", "cpu_sah_rebuild": "#52514e",
-          "gpu_lbvh_rebuild": "#2a78d6", "gpu_ploc_rebuild": "#1baf7a"}
+          "gpu_ploc": "#1baf7a", "cpu_trbvh": "#8a8984", "gpu_trbvh": "#d6457a", "gpu_refit": "#eda100",
+          "cpu_sah_rebuild": "#52514e", "gpu_lbvh_rebuild": "#2a78d6", "gpu_ploc_rebuild": "#1baf7a",
+          "gpu_trbvh_rebuild": "#d6457a"}
 STAGE_COLORS = {"bounds": "#1baf7a", "morton": "#eda100", "sort": "#eb6834", "hierarchy": "#2a78d6",
-                "fit": "#7a5bd6", "cluster": "#d6457a", "convert": "#8a8984"}
-STAGES = ["bounds", "morton", "sort", "hierarchy", "fit", "cluster", "convert"]
+                "fit": "#7a5bd6", "cluster": "#d6457a", "restructure": "#10172a", "convert": "#8a8984"}
+STAGES = ["bounds", "morton", "sort", "hierarchy", "fit", "cluster", "restructure", "convert"]
 LABELS = {"cpu_sah": "CPU binned SAH", "cpu_lbvh": "CPU LBVH (1 thread)", "gpu_lbvh": "GPU LBVH",
           "cpu_ploc": "CPU PLOC (1 thread)", "gpu_ploc": "GPU PLOC",
+          "cpu_trbvh": "CPU TRBVH (1 thread)", "gpu_trbvh": "GPU TRBVH", "gpu_trbvh_rebuild": "GPU TRBVH rebuild",
           "cpu_sah_rebuild": "CPU SAH rebuild", "gpu_lbvh_rebuild": "GPU LBVH rebuild",
           "gpu_ploc_rebuild": "GPU PLOC rebuild", "gpu_refit": "GPU refit (frame-0 topology)"}
-TREE_LABELS = {"cpu_sah": "SAH tree", "gpu_lbvh": "LBVH tree", "gpu_ploc": "PLOC tree"}
-BUILDERS = ["cpu_sah", "cpu_lbvh", "cpu_ploc", "gpu_lbvh", "gpu_ploc"]
+TREE_LABELS = {"cpu_sah": "SAH tree", "gpu_lbvh": "LBVH tree", "gpu_ploc": "PLOC tree", "gpu_trbvh": "TRBVH tree"}
+BUILDERS = ["cpu_sah", "cpu_lbvh", "cpu_ploc", "cpu_trbvh", "gpu_lbvh", "gpu_ploc", "gpu_trbvh"]
 MODEL_ORDER = ["bunny", "dragon", "buddha", "lucy"]
 MODEL_MARKERS = {"bunny": "o", "dragon": "s", "buddha": "D", "lucy": "^"}
 TEXT, TEXT2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
@@ -96,13 +98,13 @@ def build_time_plot(build):
             continue
         ax.plot([p[0] for p in pts], [p[1] for p in pts], marker="o", color=COLORS[b], label=LABELS[b],
                 linestyle="--" if b.startswith("cpu_") and b != "cpu_sah" else "-")
-        if b in ("cpu_sah", "gpu_lbvh", "gpu_ploc"):
+        if b in ("cpu_sah", "gpu_lbvh", "gpu_ploc", "gpu_trbvh"):
             for i, v in pts:
                 ax.annotate(fmt_ms(v), (i, v), textcoords="offset points", xytext=(0, 9), ha="center", fontsize=9,
                             color=COLORS[b])
     last = models[-1]
     lines = []
-    for b in ("gpu_lbvh", "gpu_ploc"):
+    for b in ("gpu_lbvh", "gpu_ploc", "gpu_trbvh"):
         if (last, b) in by and (last, "cpu_sah") in by:
             lines.append(f"{LABELS[b]}: {by[(last, 'cpu_sah')]['build_ms'] / by[(last, b)]['build_ms']:.0f}x faster "
                          f"than CPU SAH")
@@ -126,8 +128,9 @@ def stage_plot(build):
     if not rows:
         return
     models = models_in(rows)
-    panels = [b for b in ("gpu_lbvh", "gpu_ploc", "cpu_lbvh", "cpu_ploc") if any(r["builder"] == b for r in rows)]
-    fig, axes = plt.subplots(2, 2, figsize=(11, 8), squeeze=False)
+    panels = [b for b in ("gpu_lbvh", "gpu_ploc", "gpu_trbvh", "cpu_lbvh", "cpu_ploc", "cpu_trbvh")
+              if any(r["builder"] == b for r in rows)]
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8), squeeze=False)
     for ax, b in zip(axes.flat, panels):
         by = {r["model"]: r for r in rows if r["builder"] == b}
         bottom = [0.0] * len(models)
@@ -159,7 +162,7 @@ def quality_plot(build, render, trav):
     if not rows:
         return
     models = models_in(rows)
-    trees = [b for b in ("cpu_sah", "gpu_lbvh", "gpu_ploc") if any(r["builder"] == b for r in rows)]
+    trees = [b for b in ("cpu_sah", "gpu_lbvh", "gpu_ploc", "gpu_trbvh") if any(r["builder"] == b for r in rows)]
     by = {(r["model"], r["builder"]): r for r in rows}
     rend = {(r["model"], r["experiment"].replace("quality_", ""), r["mode"]): r for r in render
             if str(r["experiment"]).startswith("quality_")}
@@ -322,7 +325,7 @@ def time_to_image_plot(build, render):
     model = sweep[0]["model"]
     fits = {}
     fig, ax = plt.subplots(figsize=(8, 4.8))
-    for b in ("cpu_sah", "gpu_lbvh", "gpu_ploc"):
+    for b in ("cpu_sah", "gpu_lbvh", "gpu_ploc", "gpu_trbvh"):
         pts = sorted(((r["width"] * r["height"] * (2 + r["ao"]), r) for r in sweep if r["experiment"] == f"rays_{b}"),
                      key=lambda p: p[0])
         if len(pts) < 2 or (model, b) not in size:
@@ -343,7 +346,7 @@ def time_to_image_plot(build, render):
         ax.plot(rays, [(fixed + a + c * r) / 1e3 for r in rays], color=COLORS[b], label=TREE_LABELS[b])
         ax.scatter(xs, [(fixed + y) / 1e3 for y in ys], color=COLORS[b], s=22, zorder=3)
     notes = []
-    for b1, b2 in (("gpu_lbvh", "gpu_ploc"), ("gpu_ploc", "cpu_sah"), ("gpu_lbvh", "cpu_sah")):
+    for b1, b2 in (("gpu_lbvh", "cpu_sah"), ("gpu_trbvh", "cpu_sah")):
         if b1 in fits and b2 in fits:
             (f1, c1), (f2, c2) = fits[b1], fits[b2]
             if c1 > c2 and f2 > f1:
@@ -363,6 +366,51 @@ def time_to_image_plot(build, render):
     save(fig, "time_to_image.png")
 
 
+def trbvh_plot(build):
+    rows = sorted([r for r in build if r["experiment"] == "trbvh_passes"], key=lambda r: r["trbvh_passes"])
+    sah = {r["model"]: r["sah_cost"] for r in build if r["experiment"] == "size" and r["builder"] == "cpu_sah"}
+    if not rows or rows[0]["model"] not in sah:
+        return
+    model = rows[0]["model"]
+    ref = sah[model]
+    extra = {r["experiment"]: r for r in build if r["experiment"] in ("trbvh_treelet", "trbvh_thread")}
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
+    xs = [int(r["trbvh_passes"]) for r in rows]
+    axes[0].plot(xs, [r["build_ms"] for r in rows], marker="o", color=COLORS["gpu_trbvh"], label="GPU TRBVH, 7-leaf, warp")
+    for x, r in zip(xs, rows):
+        axes[0].annotate(f"{r['build_ms']:.1f}", (x, r["build_ms"]), textcoords="offset points", xytext=(0, 8),
+                         ha="center", fontsize=9, color=TEXT2)
+    ys = [100 * r["sah_cost"] / ref for r in rows]
+    axes[1].plot(xs, ys, marker="o", color=COLORS["gpu_trbvh"], label="GPU TRBVH, 7-leaf treelets")
+    for x, y in zip(xs, ys):
+        axes[1].annotate(f"{y:.1f}%", (x, y), textcoords="offset points", xytext=(0, -16), ha="center", fontsize=9,
+                         color=TEXT2)
+    if "trbvh_treelet" in extra:
+        r = extra["trbvh_treelet"]
+        p = int(r["trbvh_passes"])
+        axes[0].scatter([p], [r["build_ms"]], marker="s", color=COLORS["gpu_ploc"], zorder=3, label="5-leaf treelets")
+        axes[1].scatter([p], [100 * r["sah_cost"] / ref], marker="s", color=COLORS["gpu_ploc"], zorder=3,
+                        label="5-leaf treelets")
+    if "trbvh_thread" in extra:
+        r = extra["trbvh_thread"]
+        axes[0].scatter([int(r["trbvh_passes"])], [r["build_ms"]], marker="D", color=COLORS["cpu_sah"], zorder=3,
+                        label=f"one thread per treelet ({r['build_ms']:.0f} ms)")
+    axes[0].set_yscale("log")
+    axes[0].set_ylabel("build time (ms, log scale)")
+    axes[0].set_title("Build time", loc="left")
+    axes[1].axhline(100, color=COLORS["cpu_sah"], linestyle=":", linewidth=1.5, label="CPU SAH = 100%")
+    axes[1].set_ylabel("SAH cost (% of CPU SAH)")
+    axes[1].set_title("Tree quality", loc="left")
+    axes[1].margins(y=0.2)
+    axes[0].legend(loc="lower right", fontsize=8.5)
+    axes[1].legend(loc="upper right", fontsize=8.5)
+    for ax in axes:
+        ax.set_xticks(xs)
+        ax.set_xlabel("restructuring passes (0 = plain LBVH)")
+    fig.suptitle(f"TRBVH: passes, treelet size and warp cooperation ({model})", x=0.01, ha="left", fontweight="bold")
+    save(fig, "trbvh_passes.png")
+
+
 def main():
     build, render = read("build.csv"), read("build_render.csv")
     trav, dyn = read("traversal.csv"), read("dynamic.csv")
@@ -370,6 +418,7 @@ def main():
     stage_plot(build)
     quality_plot(build, render, trav)
     radius_plot(build)
+    trbvh_plot(build)
     pareto_plot(build)
     time_to_image_plot(build, render)
     dynamic_plots(dyn)
