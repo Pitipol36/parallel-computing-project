@@ -7,3 +7,4 @@ data/*
 renders/verify_*
 __pycache__/
 .vs/
+renders/explode_*.png

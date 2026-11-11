@@ -38,6 +38,35 @@ struct DeviceBvh {
 
 BVH build_lbvh_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);
 
+// Reusable GPU LBVH builder: keeps its working and output buffers between builds, builds
+// from vertices and faces that are already on the device, and can refit the last tree
+// (new triangle positions, same topology). Used per frame by the dynamic-scene experiment.
+class GpuLbvhBuilder {
+public:
+    GpuLbvhBuilder();
+    ~GpuLbvhBuilder();
+    GpuLbvhBuilder(const GpuLbvhBuilder&) = delete;
+    GpuLbvhBuilder& operator=(const GpuLbvhBuilder&) = delete;
+
+    // Allocates the buffers for numTris triangles ahead of time (build() also does it).
+    bool reserve(int numTris, std::string& err);
+    // dVerts: vec3[], dFaces: Face[numTris], both device pointers.
+    bool build(const void* dVerts, const void* dFaces, int numTris, const BuildParams& params, BuildReport* report,
+               std::string& err);
+    // Recomputes every box and precomputed triangle of the last tree from new vertex
+    // positions, bottom-up, keeping the topology. ms = kernel time.
+    bool refit(const void* dVerts, const void* dFaces, double& ms, std::string& err);
+    // The current tree (owned by the builder; do not release).
+    const DeviceBvh& tree() const;
+    bool download(BVH& out, std::string& err) const;
+    // Hands the tree's buffers to the caller (who releases them); the builder forgets them.
+    DeviceBvh take_tree();
+
+private:
+    struct Impl;
+    Impl* impl_;
+};
+
 // GPU LBVH. hostOut (optional) receives a host copy of the tree; devOut (optional) keeps the
 // device-resident tree (caller releases it). At least one must be given.
 bool build_lbvh_gpu(const Mesh& mesh, const BuildParams& params, BVH* hostOut, DeviceBvh* devOut,

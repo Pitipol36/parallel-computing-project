@@ -194,13 +194,72 @@ __global__ void k_place_tris(DeviceTree tree, const uint32_t* __restrict__ order
     triOrder[pos] = f;
 }
 
+// ---------------------------------------------------------------- refit
+
+// Parent of every node of a flattened tree (left child = i + 1, right = leftOrFirst).
+__global__ void k_flat_parents(const BVHNode* __restrict__ nodes, int numNodes, int* __restrict__ parent) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numNodes) return;
+    if (i == 0) parent[0] = -1;
+    const BVHNode nd = nodes[i];
+    if (nd.count == 0) {
+        parent[i + 1] = i;
+        parent[nd.leftOrFirst] = i;
+    }
+}
+
+// Refit: each leaf recomputes its triangles and box from the current vertices, then climbs;
+// the second child to arrive at a node writes the union (same pattern as k_fit). The
+// topology words (.w) are never changed.
+__global__ void k_refit(float4* nodes, int numNodes, const int* __restrict__ parent, unsigned int* __restrict__ visited,
+                        const vec3* __restrict__ verts, const Face* __restrict__ faces,
+                        const uint32_t* __restrict__ triOrder, Tri* __restrict__ tris) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= numNodes) return;
+    const float4 lo = nodes[2 * i], hi = nodes[2 * i + 1];
+    const uint32_t count = __float_as_uint(hi.w);
+    if (count == 0) return;  // interior nodes are written by the climbing leaves
+    const uint32_t first = __float_as_uint(lo.w);
+    AABB b = aabb_empty();
+    for (uint32_t pos = first; pos < first + count; ++pos) {
+        const uint32_t f = triOrder[pos];
+        const Face fc = faces[f];
+        const vec3 v0 = verts[fc.a], v1 = verts[fc.b], v2 = verts[fc.c];
+        aabb_grow(b, v0);
+        aabb_grow(b, v1);
+        aabb_grow(b, v2);
+        tris[pos] = make_tri(v0, v1, v2, f);
+    }
+    nodes[2 * i] = make_float4(b.bmin.x, b.bmin.y, b.bmin.z, lo.w);
+    nodes[2 * i + 1] = make_float4(b.bmax.x, b.bmax.y, b.bmax.z, hi.w);
+    for (int p = parent[i]; p >= 0; p = parent[p]) {
+        __threadfence();
+        if (atomicAdd(&visited[p], 1u) == 0) return;
+        const float4 plo = nodes[2 * p], phi = nodes[2 * p + 1];  // .w only: topology, never written
+        const int l = p + 1, r = int(__float_as_uint(plo.w));
+        const float4 llo = __ldcg(nodes + 2 * l), lhi = __ldcg(nodes + 2 * l + 1);
+        const float4 rlo = __ldcg(nodes + 2 * r), rhi = __ldcg(nodes + 2 * r + 1);
+        nodes[2 * p] = make_float4(fminf(llo.x, rlo.x), fminf(llo.y, rlo.y), fminf(llo.z, rlo.z), plo.w);
+        nodes[2 * p + 1] = make_float4(fmaxf(lhi.x, rhi.x), fmaxf(lhi.y, rhi.y), fmaxf(lhi.z, rhi.z), phi.w);
+    }
+}
+
 // ---------------------------------------------------------------- host side
 
 struct Buf {
     void* p = nullptr;
-    ~Buf() { if (p) cudaFree(p); }
-    cudaError_t alloc(size_t bytes) { return cudaMalloc(&p, bytes ? bytes : 4); }
-    void* take() { void* q = p; p = nullptr; return q; }
+    size_t bytes = 0;
+    ~Buf() { release(); }
+    void release() { if (p) cudaFree(p); p = nullptr; bytes = 0; }
+    // Grows (never shrinks) to at least `need` bytes.
+    cudaError_t ensure(size_t need) {
+        need = need ? need : 4;
+        if (p && bytes >= need) return cudaSuccess;
+        release();
+        bytes = need;
+        return cudaMalloc(&p, need);
+    }
+    void* take() { void* q = p; p = nullptr; bytes = 0; return q; }
     template <class T> T* as() const { return static_cast<T*>(p); }
 };
 
@@ -236,123 +295,200 @@ double ms_since(Clock::time_point t) { return std::chrono::duration<double, std:
 
 }  // namespace
 
-bool build_lbvh_gpu(const Mesh& mesh, const BuildParams& params, BVH* hostOut, DeviceBvh* devOut,
-                    BuildReport* report, std::string& err) {
-    const int n = int(mesh.faces.size());
-    const int maxLeaf = std::max(1, params.maxLeaf);
+struct GpuLbvhBuilder::Impl {
+    Buf boxes, cents, partial, frame, keys, keysOut, vals, valsOut, left, right, parent, visited, boxLo, boxHi,
+        triCount, dfsCount, counters, sortTemp;
+    Buf nodes, tris, order;           // outputs
+    Buf flatParent, flatVisited;      // refit
+    bool flatParentsValid = false;
+    DeviceBvh tree;                   // view onto nodes/tris/order
+    int maxLeaf = 4;
+
+    bool ensure(int n, std::string& err) {
+        const size_t total = size_t(2 * n - 1), inner = size_t(std::max(n - 1, 1));
+        CU(boxes.ensure(size_t(n) * sizeof(AABB)));
+        CU(cents.ensure(size_t(n) * sizeof(vec3)));
+        CU(partial.ensure(REDUCE_BLOCKS * sizeof(AABB)));
+        CU(frame.ensure(sizeof(MortonFrame)));
+        CU(keys.ensure(size_t(n) * 8));
+        CU(keysOut.ensure(size_t(n) * 8));
+        CU(vals.ensure(size_t(n) * 4));
+        CU(valsOut.ensure(size_t(n) * 4));
+        CU(left.ensure(inner * 4));
+        CU(right.ensure(inner * 4));
+        CU(parent.ensure(total * 4));
+        CU(visited.ensure(inner * 4));
+        CU(boxLo.ensure(total * sizeof(float4)));
+        CU(boxHi.ensure(total * sizeof(float4)));
+        CU(triCount.ensure(total * 4));
+        CU(dfsCount.ensure(total * 4));
+        CU(counters.ensure(4 * sizeof(int)));
+        size_t sortBytes = 0;
+        CU(cub::DeviceRadixSort::SortPairs(nullptr, sortBytes, keys.as<uint64_t>(), keysOut.as<uint64_t>(),
+                                           vals.as<uint32_t>(), valsOut.as<uint32_t>(), n, 0, 63));
+        CU(sortTemp.ensure(sortBytes));
+        // The collapsed tree has at most 2n-1 nodes, so no mid-build sizing sync is needed.
+        CU(nodes.ensure(total * sizeof(BVHNode)));
+        CU(tris.ensure(size_t(n) * sizeof(Tri)));
+        CU(order.ensure(size_t(n) * 4));
+        return true;
+    }
+};
+
+GpuLbvhBuilder::GpuLbvhBuilder() : impl_(new Impl) {}
+GpuLbvhBuilder::~GpuLbvhBuilder() { delete impl_; }
+const DeviceBvh& GpuLbvhBuilder::tree() const { return impl_->tree; }
+bool GpuLbvhBuilder::reserve(int numTris, std::string& err) { return impl_->ensure(std::max(numTris, 1), err); }
+
+DeviceBvh GpuLbvhBuilder::take_tree() {
+    DeviceBvh t = impl_->tree;
+    t.nodes = impl_->nodes.take();
+    t.tris = impl_->tris.take();
+    t.triOrder = impl_->order.take();
+    impl_->tree = DeviceBvh();
+    impl_->flatParentsValid = false;
+    return t;
+}
+
+bool GpuLbvhBuilder::build(const void* dVertsV, const void* dFacesV, int n, const BuildParams& params,
+                           BuildReport* report, std::string& err) {
     if (n < 1) { err = "empty mesh"; return false; }
-    if (!hostOut && !devOut) { err = "no output requested"; return false; }
-    BuildReport rep;
+    Impl& I = *impl_;
+    const vec3* dVerts = static_cast<const vec3*>(dVertsV);
+    const Face* dFaces = static_cast<const Face*>(dFacesV);
+    const int maxLeaf = std::max(1, params.maxLeaf);
     const int total = 2 * n - 1;
-
-    // Upload the mesh (timed separately from the build).
-    auto tUp = Clock::now();
-    Buf dVerts, dFaces;
-    CU(dVerts.alloc(mesh.vertices.size() * sizeof(vec3)));
-    CU(dFaces.alloc(mesh.faces.size() * sizeof(Face)));
-    CU(cudaMemcpy(dVerts.p, mesh.vertices.data(), mesh.vertices.size() * sizeof(vec3), cudaMemcpyHostToDevice));
-    CU(cudaMemcpy(dFaces.p, mesh.faces.data(), mesh.faces.size() * sizeof(Face), cudaMemcpyHostToDevice));
-
-    // Working buffers.
-    Buf dBoxes, dCents, dPartial, dFrame, dKeys, dKeysOut, dVals, dValsOut, dLeft, dRight, dParent, dVisited,
-        dBoxLo, dBoxHi, dTriCount, dDfsCount, dCounters, dSortTemp;
-    CU(dBoxes.alloc(size_t(n) * sizeof(AABB)));
-    CU(dCents.alloc(size_t(n) * sizeof(vec3)));
-    CU(dPartial.alloc(REDUCE_BLOCKS * sizeof(AABB)));
-    CU(dFrame.alloc(sizeof(MortonFrame)));
-    CU(dKeys.alloc(size_t(n) * 8));
-    CU(dKeysOut.alloc(size_t(n) * 8));
-    CU(dVals.alloc(size_t(n) * 4));
-    CU(dValsOut.alloc(size_t(n) * 4));
-    CU(dLeft.alloc(size_t(std::max(n - 1, 1)) * 4));
-    CU(dRight.alloc(size_t(std::max(n - 1, 1)) * 4));
-    CU(dParent.alloc(size_t(total) * 4));
-    CU(dVisited.alloc(size_t(std::max(n - 1, 1)) * 4));
-    CU(dBoxLo.alloc(size_t(total) * sizeof(float4)));
-    CU(dBoxHi.alloc(size_t(total) * sizeof(float4)));
-    CU(dTriCount.alloc(size_t(total) * 4));
-    CU(dDfsCount.alloc(size_t(total) * 4));
-    CU(dCounters.alloc(3 * sizeof(int)));
-    size_t sortTempBytes = 0;
-    CU(cub::DeviceRadixSort::SortPairs(nullptr, sortTempBytes, dKeys.as<uint64_t>(), dKeysOut.as<uint64_t>(),
-                                       dVals.as<uint32_t>(), dValsOut.as<uint32_t>(), n, 0, 63));
-    CU(dSortTemp.alloc(sortTempBytes));
-    // Outputs: the collapsed tree has at most 2n-1 nodes, so no mid-build sizing sync is needed.
-    Buf dNodes, dTris, dOrder;
-    CU(dNodes.alloc(size_t(total) * sizeof(BVHNode)));
-    CU(dTris.alloc(size_t(n) * sizeof(Tri)));
-    CU(dOrder.alloc(size_t(n) * 4));
-    CU(cudaMemset(dCounters.p, 0, 3 * sizeof(int)));
-    CU(cudaMemset(dVisited.p, 0, size_t(std::max(n - 1, 1)) * 4));
-    CU(cudaDeviceSynchronize());
-    rep.uploadMs = ms_since(tUp);
+    if (!I.ensure(n, err)) return false;
+    size_t sortBytes = I.sortTemp.bytes;
+    CU(cudaMemsetAsync(I.counters.p, 0, 4 * sizeof(int)));
+    CU(cudaMemsetAsync(I.visited.p, 0, size_t(std::max(n - 1, 1)) * 4));
+    I.flatParentsValid = false;
+    I.maxLeaf = maxLeaf;
 
     Events ev;
     cudaEvent_t e0 = ev.mark();
-    k_tri_bounds<<<blocks_for(n), BLOCK>>>(dVerts.as<vec3>(), dFaces.as<Face>(), n, dBoxes.as<AABB>(), dCents.as<vec3>());
+    k_tri_bounds<<<blocks_for(n), BLOCK>>>(dVerts, dFaces, n, I.boxes.as<AABB>(), I.cents.as<vec3>());
     const int rb = std::min(REDUCE_BLOCKS, blocks_for(n));
-    k_reduce_centroids<<<rb, BLOCK>>>(dCents.as<vec3>(), n, dPartial.as<AABB>());
-    k_reduce_partials<<<1, BLOCK>>>(dPartial.as<AABB>(), rb, dFrame.as<MortonFrame>());
+    k_reduce_centroids<<<rb, BLOCK>>>(I.cents.as<vec3>(), n, I.partial.as<AABB>());
+    k_reduce_partials<<<1, BLOCK>>>(I.partial.as<AABB>(), rb, I.frame.as<MortonFrame>());
     cudaEvent_t e1 = ev.mark();
-    k_morton<<<blocks_for(n), BLOCK>>>(dCents.as<vec3>(), n, dFrame.as<MortonFrame>(), dKeys.as<uint64_t>(),
-                                       dVals.as<uint32_t>());
+    k_morton<<<blocks_for(n), BLOCK>>>(I.cents.as<vec3>(), n, I.frame.as<MortonFrame>(), I.keys.as<uint64_t>(),
+                                       I.vals.as<uint32_t>());
     cudaEvent_t e2 = ev.mark();
-    CU(cub::DeviceRadixSort::SortPairs(dSortTemp.p, sortTempBytes, dKeys.as<uint64_t>(), dKeysOut.as<uint64_t>(),
-                                       dVals.as<uint32_t>(), dValsOut.as<uint32_t>(), n, 0, 63));
+    CU(cub::DeviceRadixSort::SortPairs(I.sortTemp.p, sortBytes, I.keys.as<uint64_t>(), I.keysOut.as<uint64_t>(),
+                                       I.vals.as<uint32_t>(), I.valsOut.as<uint32_t>(), n, 0, 63));
     cudaEvent_t e3 = ev.mark();
     if (n > 1)
-        k_hierarchy<<<blocks_for(n - 1), BLOCK>>>(dKeysOut.as<uint64_t>(), n, dLeft.as<int>(), dRight.as<int>(),
-                                                 dParent.as<int>());
+        k_hierarchy<<<blocks_for(n - 1), BLOCK>>>(I.keysOut.as<uint64_t>(), n, I.left.as<int>(), I.right.as<int>(),
+                                                 I.parent.as<int>());
     else
-        CU(cudaMemsetAsync(dParent.p, 0xff, sizeof(int)));  // parent[0] = -1
+        CU(cudaMemsetAsync(I.parent.p, 0xff, sizeof(int)));  // parent[0] = -1
     cudaEvent_t e4 = ev.mark();
-    k_fit<<<blocks_for(n), BLOCK>>>(dBoxes.as<AABB>(), dValsOut.as<uint32_t>(), n, dLeft.as<int>(), dRight.as<int>(),
-                                    dParent.as<int>(), maxLeaf, dVisited.as<unsigned int>(), dBoxLo.as<float4>(),
-                                    dBoxHi.as<float4>(), dTriCount.as<uint32_t>(), dDfsCount.as<uint32_t>());
+    k_fit<<<blocks_for(n), BLOCK>>>(I.boxes.as<AABB>(), I.valsOut.as<uint32_t>(), n, I.left.as<int>(),
+                                    I.right.as<int>(), I.parent.as<int>(), maxLeaf, I.visited.as<unsigned int>(),
+                                    I.boxLo.as<float4>(), I.boxHi.as<float4>(), I.triCount.as<uint32_t>(),
+                                    I.dfsCount.as<uint32_t>());
     cudaEvent_t e5 = ev.mark();
-    DeviceTree tree{n, 0, dLeft.as<int>(), dRight.as<int>(), dParent.as<int>(), dTriCount.as<uint32_t>(),
-                    dDfsCount.as<uint32_t>()};
-    k_convert_nodes<<<blocks_for(total), BLOCK>>>(tree, dBoxLo.as<float4>(), dBoxHi.as<float4>(), maxLeaf,
-                                                  dNodes.as<BVHNode>(), dCounters.as<int>(), dCounters.as<int>() + 1);
-    k_place_tris<<<blocks_for(n), BLOCK>>>(tree, dValsOut.as<uint32_t>(), dVerts.as<vec3>(), dFaces.as<Face>(),
-                                           dTris.as<Tri>(), dOrder.as<uint32_t>());
+    DeviceTree tree{n, 0, I.left.as<int>(), I.right.as<int>(), I.parent.as<int>(), I.triCount.as<uint32_t>(),
+                    I.dfsCount.as<uint32_t>()};
+    k_convert_nodes<<<blocks_for(total), BLOCK>>>(tree, I.boxLo.as<float4>(), I.boxHi.as<float4>(), maxLeaf,
+                                                  I.nodes.as<BVHNode>(), I.counters.as<int>(), I.counters.as<int>() + 1);
+    k_place_tris<<<blocks_for(n), BLOCK>>>(tree, I.valsOut.as<uint32_t>(), dVerts, dFaces, I.tris.as<Tri>(),
+                                           I.order.as<uint32_t>());
     cudaEvent_t e6 = ev.mark();
     CU(cudaGetLastError());
     CU(cudaEventSynchronize(e6));
 
+    BuildReport rep;
     rep.stages = {{"bounds", elapsed(e0, e1)},  {"morton", elapsed(e1, e2)}, {"sort", elapsed(e2, e3)},
                   {"hierarchy", elapsed(e3, e4)}, {"fit", elapsed(e4, e5)},   {"convert", elapsed(e5, e6)}};
     rep.buildMs = elapsed(e0, e6);
 
     int counters[2] = {0, 0};
     uint32_t numNodes = 0;  // the root's collapsed count (root = node 0)
-    CU(cudaMemcpy(counters, dCounters.p, 2 * sizeof(int), cudaMemcpyDeviceToHost));
-    CU(cudaMemcpy(&numNodes, dDfsCount.p, 4, cudaMemcpyDeviceToHost));
+    CU(cudaMemcpy(counters, I.counters.p, 2 * sizeof(int), cudaMemcpyDeviceToHost));
+    CU(cudaMemcpy(&numNodes, I.dfsCount.p, 4, cudaMemcpyDeviceToHost));
+    I.tree.nodes = I.nodes.p;
+    I.tree.tris = I.tris.p;
+    I.tree.triOrder = I.order.p;
+    I.tree.numNodes = numNodes;
+    I.tree.numTris = uint32_t(n);
+    I.tree.maxDepth = counters[0];
+    I.tree.leafCount = counters[1];
+    if (report) *report = rep;
+    return true;
+}
 
+bool GpuLbvhBuilder::refit(const void* dVerts, const void* dFaces, double& ms, std::string& err) {
+    Impl& I = *impl_;
+    const int numNodes = int(I.tree.numNodes);
+    if (!I.tree.nodes || numNodes == 0) { err = "refit before build"; return false; }
+    Events ev;
+    cudaEvent_t e0 = ev.mark();
+    if (!I.flatParentsValid) {  // once per topology; counted in the first refit's time
+        CU(I.flatParent.ensure(size_t(numNodes) * 4));
+        CU(I.flatVisited.ensure(size_t(numNodes) * 4));
+        k_flat_parents<<<blocks_for(numNodes), BLOCK>>>(static_cast<const BVHNode*>(I.tree.nodes), numNodes,
+                                                         I.flatParent.as<int>());
+        I.flatParentsValid = true;
+    }
+    CU(cudaMemsetAsync(I.flatVisited.p, 0, size_t(numNodes) * 4));
+    k_refit<<<blocks_for(numNodes), BLOCK>>>(static_cast<float4*>(I.tree.nodes), numNodes, I.flatParent.as<int>(),
+                                             I.flatVisited.as<unsigned int>(), static_cast<const vec3*>(dVerts),
+                                             static_cast<const Face*>(dFaces),
+                                             static_cast<const uint32_t*>(I.tree.triOrder), static_cast<Tri*>(I.tree.tris));
+    cudaEvent_t e1 = ev.mark();
+    CU(cudaGetLastError());
+    CU(cudaEventSynchronize(e1));
+    ms = elapsed(e0, e1);
+    return true;
+}
+
+bool GpuLbvhBuilder::download(BVH& b, std::string& err) const {
+    const DeviceBvh& t = impl_->tree;
+    if (!t.nodes) { err = "no tree"; return false; }
+    b = BVH();
+    b.nodes.resize(t.numNodes);
+    b.tris.resize(t.numTris);
+    b.triOrder.resize(t.numTris);
+    CU(cudaMemcpy(b.nodes.data(), t.nodes, size_t(t.numNodes) * sizeof(BVHNode), cudaMemcpyDeviceToHost));
+    CU(cudaMemcpy(b.tris.data(), t.tris, size_t(t.numTris) * sizeof(Tri), cudaMemcpyDeviceToHost));
+    CU(cudaMemcpy(b.triOrder.data(), t.triOrder, size_t(t.numTris) * 4, cudaMemcpyDeviceToHost));
+    b.maxDepth = t.maxDepth;
+    b.leafCount = t.leafCount;
+    return true;
+}
+
+bool build_lbvh_gpu(const Mesh& mesh, const BuildParams& params, BVH* hostOut, DeviceBvh* devOut,
+                    BuildReport* report, std::string& err) {
+    const int n = int(mesh.faces.size());
+    if (n < 1) { err = "empty mesh"; return false; }
+    if (!hostOut && !devOut) { err = "no output requested"; return false; }
+
+    // Upload the mesh and allocate the builder's buffers (timed separately from the build).
+    auto tUp = Clock::now();
+    Buf dVerts, dFaces;
+    CU(dVerts.ensure(mesh.vertices.size() * sizeof(vec3)));
+    CU(dFaces.ensure(mesh.faces.size() * sizeof(Face)));
+    CU(cudaMemcpy(dVerts.p, mesh.vertices.data(), mesh.vertices.size() * sizeof(vec3), cudaMemcpyHostToDevice));
+    CU(cudaMemcpy(dFaces.p, mesh.faces.data(), mesh.faces.size() * sizeof(Face), cudaMemcpyHostToDevice));
+    GpuLbvhBuilder builder;
+    if (!builder.reserve(n, err)) return false;
+    CU(cudaDeviceSynchronize());
+    const double uploadMs = ms_since(tUp);
+
+    BuildReport rep;
+    if (!builder.build(dVerts.p, dFaces.p, n, params, &rep, err)) return false;
+    rep.uploadMs = uploadMs;
     if (hostOut) {
         auto tDown = Clock::now();
-        BVH& b = *hostOut;
-        b = BVH();
-        b.nodes.resize(numNodes);
-        b.tris.resize(n);
-        b.triOrder.resize(n);
-        CU(cudaMemcpy(b.nodes.data(), dNodes.p, size_t(numNodes) * sizeof(BVHNode), cudaMemcpyDeviceToHost));
-        CU(cudaMemcpy(b.tris.data(), dTris.p, size_t(n) * sizeof(Tri), cudaMemcpyDeviceToHost));
-        CU(cudaMemcpy(b.triOrder.data(), dOrder.p, size_t(n) * 4, cudaMemcpyDeviceToHost));
-        b.maxDepth = counters[0];
-        b.leafCount = counters[1];
-        b.buildMs = rep.buildMs;
+        if (!builder.download(*hostOut, err)) return false;
+        hostOut->buildMs = rep.buildMs;
         rep.downloadMs = ms_since(tDown);
     }
     if (devOut) {
         devOut->release();
-        devOut->numNodes = numNodes;
-        devOut->numTris = uint32_t(n);
-        devOut->maxDepth = counters[0];
-        devOut->leafCount = counters[1];
-        devOut->nodes = dNodes.take();
-        devOut->tris = dTris.take();
-        devOut->triOrder = dOrder.take();
+        *devOut = builder.take_tree();
     }
     if (report) *report = rep;
     return true;

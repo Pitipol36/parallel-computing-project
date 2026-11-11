@@ -1,0 +1,7 @@
+experiment,model,tris,builder,mode,width,height,ao,rays,box_tests_per_ray,tri_tests_per_ray
+quality,bunny,69451,cpu_sah,gpu_bvh_opt,1920,1080,4,3553236,24.508,1.84725
+quality,bunny,69451,gpu_lbvh,gpu_bvh_opt,1920,1080,4,3553236,26.2624,3.36032
+quality,dragon,871414,cpu_sah,gpu_bvh_opt,1920,1080,4,3466267,30.9115,2.20638
+quality,dragon,871414,gpu_lbvh,gpu_bvh_opt,1920,1080,4,3466267,35.6317,3.45027
+quality,buddha,1087716,cpu_sah,gpu_bvh_opt,1920,1080,4,3344427,30.4994,2.21488
+quality,buddha,1087716,gpu_lbvh,gpu_bvh_opt,1920,1080,4,3344427,35.8171,3.52494

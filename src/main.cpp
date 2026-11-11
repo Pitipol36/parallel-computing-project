@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "animate.h"
 #include "builders.h"
 #include "bvh.h"
 #include "camera.h"
@@ -47,6 +48,9 @@ struct Options {
     bool buildBench = false;
     std::string buildCsv;
     std::string statsCsv;
+    bool dynamic = false;
+    int frames = 60;
+    std::string dynamicCsv;
 };
 
 void usage() {
@@ -73,6 +77,11 @@ void usage() {
         "                      print tree quality, append to --build-csv; no rendering\n"
         "  --build-csv FILE    CSV for --build-bench rows (default results/build.csv)\n"
         "  --stats-csv FILE    append traversal counters per mode (RT_TRAVERSAL_STATS builds only)\n"
+        "  --dynamic           exploding-mesh animation; per frame compares a cpu_sah rebuild, a\n"
+        "                      gpu_lbvh rebuild and a refit of the frame-0 gpu_lbvh tree\n"
+        "  --frames N          frames for --dynamic (default 60)\n"
+        "  --dynamic-csv FILE  per-frame rows for --dynamic (default results/dynamic.csv); with\n"
+        "                      --out, every frame of the gpu_lbvh render is written as PNG\n"
         "  --yaw D --pitch D --fov D   camera orbit angles and field of view (25, 15, 35)\n"
         "  --up y|z            model up axis (default y)\n"
         "  --brute-rows N      rows per gpu_brute launch (default 8; keeps launches under the\n"
@@ -133,6 +142,9 @@ bool parse_args(int argc, char** argv, Options& o) {
         else if (a == "--build-bench") o.buildBench = true;
         else if (a == "--build-csv") o.buildCsv = next();
         else if (a == "--stats-csv") o.statsCsv = next();
+        else if (a == "--dynamic") o.dynamic = true;
+        else if (a == "--frames") o.frames = std::max(2, std::stoi(next()));
+        else if (a == "--dynamic-csv") o.dynamicCsv = next();
         else if (a == "-h" || a == "--help") { usage(); std::exit(0); }
         else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); usage(); return false; }
     }
@@ -397,6 +409,138 @@ int run_build_bench(const Options& o) {
     return failures ? 1 : 0;
 }
 
+// ---------------------------------------------------------------- dynamic scene
+
+int run_dynamic(const Options& o) {
+    Mesh base;
+    if (!load_scene(o.model, base)) return 1;
+    std::string label = o.label.empty() ? (o.model.empty() ? "testscene" : fs::path(o.model).stem().string()) : o.label;
+    Mesh mesh = unweld(base);  // every triangle owns its vertices so pieces can fly apart
+    const int n = int(mesh.faces.size());
+    const std::vector<vec3> rest = mesh.vertices;
+
+    AABB b0 = mesh.bounds();
+    const vec3 c = (b0.bmin + b0.bmax) * 0.5f;
+    const float diag = length(b0.bmax - b0.bmin);
+    Explosion ex{c, diag, 2024u};
+    // Frame the whole explosion: grow the view bounds, keep the AO radius at the mesh's scale.
+    AABB view = {b0.bmin - make_vec3(1, 1, 1) * (0.45f * diag), b0.bmax + make_vec3(1, 1, 1) * (0.45f * diag)};
+    RenderParams rp = o.rp;
+    rp.aoRadius = o.rp.aoRadius * diag / length(view.bmax - view.bmin);
+    ShadeParams sp = make_shade_params(view, rp);
+    const int up = o.rp.upAxis;
+
+    std::string err;
+    void* dRest = device_upload(rest.data(), rest.size() * sizeof(vec3), err);
+    void* dVerts = device_upload(rest.data(), rest.size() * sizeof(vec3), err);
+    void* dFaces = device_upload(mesh.faces.data(), mesh.faces.size() * sizeof(Face), err);
+    struct Free { void* a; void* b; void* c; ~Free() { device_free(a); device_free(b); device_free(c); } } freeAll{dRest, dVerts, dFaces};
+    if (!dRest || !dVerts || !dFaces) { std::fprintf(stderr, "upload failed: %s\n", err.c_str()); return 1; }
+
+    const std::string csvPath = o.dynamicCsv.empty() ? "results/dynamic.csv" : o.dynamicCsv;
+    bool exists = fs::exists(csvPath);
+    if (fs::path(csvPath).has_parent_path()) fs::create_directories(fs::path(csvPath).parent_path());
+    std::ofstream csv(csvPath, std::ios::app);
+    if (!exists) csv << "model,tris,width,height,ao,frame,t,variant,animate_ms,update_ms,render_ms,total_ms,sah_cost\n";
+
+    std::printf("Dynamic scene: %s exploding, %d triangles, %d frames, %dx%d, %d AO\n", label.c_str(), n, o.frames,
+                rp.width, rp.height, rp.aoSamples);
+    std::printf("%5s %6s | %-28s | %-28s | %-28s\n", "frame", "t", "cpu_sah rebuild (upd+render)",
+                "gpu_lbvh rebuild", "gpu refit");
+    GpuLbvhBuilder rebuilder, refitter;
+    if (!rebuilder.reserve(n, err) || !refitter.reserve(n, err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
+    std::vector<vec3> verts;
+    struct Sum { double total = 0; double sah = 0; };
+    Sum sums[3];
+    const char* names[3] = {"cpu_sah_rebuild", "gpu_lbvh_rebuild", "gpu_refit"};
+    // Warm-up of every path at t = 0 (first CUDA calls, CUB, allocations), not recorded.
+    {
+        BuildReport r;
+        GpuTimings tm;
+        std::vector<uint32_t> px;
+        rebuilder.build(dVerts, dFaces, n, o.bp, &r, err);
+        render_gpu_resident(rebuilder.tree(), GpuMode::BvhOpt, sp, o.launch, px, nullptr, tm, err);
+    }
+    for (int f = 0; f < o.frames; ++f) {
+        const float t = float(f) / float(o.frames - 1);
+        double totals[3], upd[3], ren[3], sah[3], anim[3];
+        std::vector<uint32_t> pixels;
+
+        // GPU variants share one animation step.
+        double animMs = 0;
+        if (!animate_gpu(dRest, dVerts, n, ex, up, t, animMs, err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
+
+        // gpu_lbvh: rebuild on the device, render the resident tree.
+        {
+            BuildReport r;
+            GpuTimings tm;
+            BVH host;
+            if (!rebuilder.build(dVerts, dFaces, n, o.bp, &r, err) ||
+                !render_gpu_resident(rebuilder.tree(), GpuMode::BvhOpt, sp, o.launch, pixels, nullptr, tm, err)) {
+                std::fprintf(stderr, "gpu_lbvh frame %d: %s\n", f, err.c_str());
+                return 1;
+            }
+            rebuilder.download(host, err);  // for the SAH cost only (not timed)
+            upd[1] = r.buildMs; ren[1] = tm.e2eMs; sah[1] = tree_stats(host).sahCost; anim[1] = animMs;
+            if (!o.out.empty()) {
+                char suffix[32];
+                std::snprintf(suffix, sizeof(suffix), "%03d", f);
+                std::string p = out_path(o.out, suffix, true);
+                if (fs::path(p).has_parent_path()) fs::create_directories(fs::path(p).parent_path());
+                write_png(p, rp.width, rp.height, pixels);
+            }
+        }
+        // gpu refit: the frame-0 LBVH topology, boxes refitted every frame.
+        {
+            GpuTimings tm;
+            BVH host;
+            double ms = 0;
+            bool ok;
+            if (f == 0) {
+                BuildReport r;
+                ok = refitter.build(dVerts, dFaces, n, o.bp, &r, err);
+                ms = r.buildMs;
+            } else {
+                ok = refitter.refit(dVerts, dFaces, ms, err);
+            }
+            ok = ok && render_gpu_resident(refitter.tree(), GpuMode::BvhOpt, sp, o.launch, pixels, nullptr, tm, err);
+            if (!ok) { std::fprintf(stderr, "refit frame %d: %s\n", f, err.c_str()); return 1; }
+            refitter.download(host, err);
+            upd[2] = ms; ren[2] = tm.e2eMs; sah[2] = tree_stats(host).sahCost; anim[2] = animMs;
+        }
+        // cpu_sah: animate and rebuild on the CPU, upload the tree, render.
+        {
+            auto ta = Clock::now();
+            animate_cpu(rest, verts, ex, up, t);
+            anim[0] = ms_since(ta);
+            mesh.vertices = verts;
+            BVH bvh = build_bvh(mesh, o.bp);
+            GpuTimings tm;
+            if (!render_gpu(bvh, mesh, GpuMode::BvhOpt, sp, o.launch, pixels, nullptr, tm, err)) {
+                std::fprintf(stderr, "cpu_sah frame %d: %s\n", f, err.c_str());
+                return 1;
+            }
+            upd[0] = bvh.buildMs; ren[0] = tm.e2eMs; sah[0] = tree_stats(bvh).sahCost;
+        }
+        char cell[3][64];
+        for (int v = 0; v < 3; ++v) {
+            totals[v] = upd[v] + ren[v];
+            sums[v].total += totals[v];
+            sums[v].sah += sah[v];
+            std::snprintf(cell[v], sizeof(cell[v]), "%7.1f+%5.1f ms  SAH %6.1f", upd[v], ren[v], sah[v]);
+            csv << label << "," << n << "," << rp.width << "," << rp.height << "," << rp.aoSamples << "," << f << ","
+                << t << "," << names[v] << "," << anim[v] << "," << upd[v] << "," << ren[v] << "," << totals[v] << ","
+                << sah[v] << "\n";
+        }
+        std::printf("%5d %6.3f | %-28s | %-28s | %-28s\n", f, t, cell[0], cell[1], cell[2]);
+    }
+    std::printf("\nmean per frame (update + render, animation excluded):\n");
+    for (int v = 0; v < 3; ++v)
+        std::printf("  %-18s %8.1f ms  (%5.1f fps), mean SAH cost %.1f\n", names[v], sums[v].total / o.frames,
+                    1000.0 * o.frames / sums[v].total, sums[v].sah / o.frames);
+    return 0;
+}
+
 // ---------------------------------------------------------------- verify
 
 bool verify_scene(const Options& o, const std::string& path, const std::string& name) {
@@ -539,5 +683,6 @@ int main(int argc, char** argv) {
     Options o;
     if (!parse_args(argc, argv, o)) return 2;
     if (o.verify) return run_verify(o);
+    if (o.dynamic) return run_dynamic(o);
     return o.buildBench ? run_build_bench(o) : run_benchmark(o);
 }

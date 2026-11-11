@@ -35,6 +35,7 @@ add_library(rt_core STATIC
   src/bvh_build_lbvh_gpu.cu
   src/bvh_convert_cpu.cpp
   src/builders.cpp
+  src/animate.cu
   src/camera.cpp
   src/render_cpu.cpp
   src/render_gpu.cu
