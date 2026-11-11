@@ -1,0 +1,45 @@
+<section id="gpu-better" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Winning the quality back: PLOC and TRBVH</h2>
+<div style="display:flex;gap:40px">
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#F1F0EC;padding:40px;border-radius:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#1A8F64">PLOC · Meister & Bittner 2018</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Bottom-up clustering in Morton order</h3>
+<ol style="font-size:26px;line-height:1.45;color:#1B2233;padding-left:36px">
+<li>Each cluster finds its nearest neighbour among 8 on each side (shared-memory window)</li>
+<li>Mutual nearest pairs merge</li>
+<li>A hand-written scan compacts the survivors</li>
+</ol>
+<div style="display:flex;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:44px;font-weight:700;color:#1A8F64">110 %</p>
+<p style="font-size:24px;color:#4A5263">of SAH cost</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:44px;font-weight:700;color:#1A8F64">13.9 ms</p>
+<p style="font-size:24px;color:#4A5263">Buddha, 64 iterations</p>
+</div>
+</div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#F1F0EC;padding:40px;border-radius:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B8366A">TRBVH · Karras & Aila 2013</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Restructure the LBVH in treelets</h3>
+<ol style="font-size:26px;line-height:1.45;color:#1B2233;padding-left:36px">
+<li>Grow a 7-leaf treelet under each large node</li>
+<li>Dynamic program over all 127 subsets finds its SAH-optimal shape</li>
+<li>One warp per treelet: 9.4× faster than one thread</li>
+</ol>
+<div style="display:flex;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:44px;font-weight:700;color:#B8366A">105 %</p>
+<p style="font-size:24px;color:#4A5263">of SAH cost</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:44px;font-weight:700;color:#B8366A">58.7 ms</p>
+<p style="font-size:24px;color:#4A5263">Buddha, 3 passes</p>
+</div>
+</div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">19 · Both build node-for-node the same tree as their single-threaded CPU versions; 0 sanitizer errors or hazards</p>
+<aside>To win back the quality, I built two higher-quality GPU builders. PLOC clusters bottom-up: starting from single triangles in Morton order, every cluster looks at its eight neighbours on each side and finds the one whose merged box is smallest; mutual nearest neighbours merge, and a scan I wrote myself, the same pattern as the scan lab, compacts the survivors. Its tree is 10 percent above SAH cost, and it builds the Buddha in 14 milliseconds. TRBVH starts from the LBVH and improves it: under every large node it grows a treelet of seven subtrees and runs a small dynamic program over all 127 subsets to find the best possible shape for that treelet. On the GPU a whole warp cooperates on each treelet, which made it 9 times faster than one thread per treelet. Its tree is within 5 percent of the SAH builder, in 59 milliseconds. For both, the GPU tree is identical to the CPU version, which is how I verified them.</aside>
+</section>
