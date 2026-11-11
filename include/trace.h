@@ -21,12 +21,43 @@ HD void hit_update(Hit& h, float t, int prim) {
     }
 }
 
+// Optional traversal counters (compile with -DRT_TRAVERSAL_STATS, CMake option of the same
+// name). Without the flag the macros expand to nothing, so timing builds are unaffected.
+struct TraversalStats {
+    unsigned long long rays, boxTests, triTests;
+};
+
+#ifdef RT_TRAVERSAL_STATS
+HD void stat_flush(TraversalStats* s, uint32_t boxTests, uint32_t triTests) {
+#ifdef __CUDA_ARCH__
+    atomicAdd(&s->rays, 1ull);
+    atomicAdd(&s->boxTests, (unsigned long long)boxTests);
+    atomicAdd(&s->triTests, (unsigned long long)triTests);
+#else
+    s->rays += 1;
+    s->boxTests += boxTests;
+    s->triTests += triTests;
+#endif
+}
+#define RT_STAT_DECL uint32_t statBox_ = 0, statTri_ = 0
+#define RT_STAT_BOX(k) (statBox_ += (k))
+#define RT_STAT_TRI() (++statTri_)
+#define RT_STAT_FLUSH() \
+    do { if (stats) stat_flush(stats, statBox_, statTri_); } while (0)
+#else
+#define RT_STAT_DECL
+#define RT_STAT_BOX(k)
+#define RT_STAT_TRI()
+#define RT_STAT_FLUSH()
+#endif
+
 // Flattened BVH: float4-aligned nodes and triangles, read-only loads, precomputed inverse
 // direction, nearer child first, and stacked entry distances to skip subtrees beyond the
 // current closest hit.
 struct BvhTracer {
     const f4* nodes;  // 2 per node
     const f4* tris;   // 3 per triangle
+    TraversalStats* stats = nullptr;  // only used with RT_TRAVERSAL_STATS
 
     HD bool closest(const Ray& r, float tmax, Hit& h) const {
         h.t = tmax;
@@ -34,15 +65,18 @@ struct BvhTracer {
         uint32_t stackNode[BVH_STACK_SIZE];
         float stackDist[BVH_STACK_SIZE];
         int sp = 0;
+        RT_STAT_DECL;
 
         uint32_t node = 0;
         f4 a = ld4(nodes), b = ld4(nodes + 1);
-        if (ray_aabb(r, xyz(a), xyz(b), h.t) == RT_INF) return false;
+        RT_STAT_BOX(1);
+        if (ray_aabb(r, xyz(a), xyz(b), h.t) == RT_INF) { RT_STAT_FLUSH(); return false; }
 
         while (true) {
             uint32_t lf = float_as_uint(a.w), count = float_as_uint(b.w);
             if (count > 0) {
                 for (uint32_t i = lf; i < lf + count; ++i) {
+                    RT_STAT_TRI();
                     f4 v0 = ld4(tris + 3 * i), e1 = ld4(tris + 3 * i + 1), e2 = ld4(tris + 3 * i + 2);
                     float t;
                     if (ray_triangle(r.o, r.d, xyz(v0), xyz(e1), xyz(e2), t)) hit_update(h, t, int(i));
@@ -51,6 +85,7 @@ struct BvhTracer {
                 uint32_t c1 = node + 1, c2 = lf;
                 f4 a1 = ld4(nodes + 2 * c1), b1 = ld4(nodes + 2 * c1 + 1);
                 f4 a2 = ld4(nodes + 2 * c2), b2 = ld4(nodes + 2 * c2 + 1);
+                RT_STAT_BOX(2);
                 float d1 = ray_aabb(r, xyz(a1), xyz(b1), h.t);
                 float d2 = ray_aabb(r, xyz(a2), xyz(b2), h.t);
                 if (d2 < d1) {
@@ -73,7 +108,7 @@ struct BvhTracer {
             }
             // Pop the next subtree that can still contain a closer hit.
             while (true) {
-                if (sp == 0) return h.prim >= 0;
+                if (sp == 0) { RT_STAT_FLUSH(); return h.prim >= 0; }
                 --sp;
                 if (stackDist[sp] <= h.t) {
                     node = stackNode[sp];
@@ -89,22 +124,26 @@ struct BvhTracer {
     HD bool any(const Ray& r, float tmax) const {
         uint32_t stack[BVH_STACK_SIZE];
         int sp = 0;
+        RT_STAT_DECL;
         uint32_t node = 0;
         f4 a = ld4(nodes), b = ld4(nodes + 1);
-        if (ray_aabb(r, xyz(a), xyz(b), tmax) == RT_INF) return false;
+        RT_STAT_BOX(1);
+        if (ray_aabb(r, xyz(a), xyz(b), tmax) == RT_INF) { RT_STAT_FLUSH(); return false; }
 
         while (true) {
             uint32_t lf = float_as_uint(a.w), count = float_as_uint(b.w);
             if (count > 0) {
                 for (uint32_t i = lf; i < lf + count; ++i) {
+                    RT_STAT_TRI();
                     f4 v0 = ld4(tris + 3 * i), e1 = ld4(tris + 3 * i + 1), e2 = ld4(tris + 3 * i + 2);
                     float t;
-                    if (ray_triangle(r.o, r.d, xyz(v0), xyz(e1), xyz(e2), t) && t < tmax) return true;
+                    if (ray_triangle(r.o, r.d, xyz(v0), xyz(e1), xyz(e2), t) && t < tmax) { RT_STAT_FLUSH(); return true; }
                 }
             } else {
                 uint32_t c1 = node + 1, c2 = lf;
                 f4 a1 = ld4(nodes + 2 * c1), b1 = ld4(nodes + 2 * c1 + 1);
                 f4 a2 = ld4(nodes + 2 * c2), b2 = ld4(nodes + 2 * c2 + 1);
+                RT_STAT_BOX(2);
                 bool h1 = ray_aabb(r, xyz(a1), xyz(b1), tmax) != RT_INF;
                 bool h2 = ray_aabb(r, xyz(a2), xyz(b2), tmax) != RT_INF;
                 if (h1 || h2) {
@@ -114,7 +153,7 @@ struct BvhTracer {
                     continue;
                 }
             }
-            if (sp == 0) return false;
+            if (sp == 0) { RT_STAT_FLUSH(); return false; }
             node = stack[--sp];
             a = ld4(nodes + 2 * node);
             b = ld4(nodes + 2 * node + 1);

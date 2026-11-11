@@ -8,11 +8,15 @@
 #include "bvh.h"
 #include "camera.h"
 #include "mesh.h"
+#include "trace.h"
+
+struct DeviceBvh;
 
 // ---- CPU (single-threaded baseline) ----
-// hitIds may be null. Returns render-loop wall time in milliseconds.
+// hitIds may be null. Returns render-loop wall time in milliseconds. stats is filled only in
+// builds with RT_TRAVERSAL_STATS.
 double render_cpu(const BVH& bvh, const ShadeParams& sp, std::vector<uint32_t>& pixels,
-                  std::vector<int>* hitIds);
+                  std::vector<int>* hitIds, TraversalStats* stats = nullptr);
 
 // ---- GPU ----
 enum class GpuMode { Brute, BvhNaive, BvhOpt, Persistent };
@@ -25,6 +29,7 @@ struct GpuTimings {
     double uploadMs = 0;    // alloc + host-to-device copy of scene data
     double downloadMs = 0;  // device-to-host copy of the image (and hit IDs)
     double e2eMs = 0;       // wall time of upload + kernel + download + free
+    TraversalStats stats{};  // gpu_bvh_opt / persistent, only with RT_TRAVERSAL_STATS
 };
 
 struct GpuLaunch {
@@ -37,6 +42,12 @@ struct GpuLaunch {
 bool render_gpu(const BVH& bvh, const Mesh& mesh, GpuMode mode, const ShadeParams& sp,
                 const GpuLaunch& launch, std::vector<uint32_t>& pixels, std::vector<int>* hitIds,
                 GpuTimings& timings, std::string& err);
+
+// Renders with a tree that is already on the GPU (from a GPU builder): no scene upload.
+// Supports gpu_bvh_opt and gpu_bvh_persistent.
+bool render_gpu_resident(const DeviceBvh& bvh, GpuMode mode, const ShadeParams& sp, const GpuLaunch& launch,
+                         std::vector<uint32_t>& pixels, std::vector<int>* hitIds, GpuTimings& timings,
+                         std::string& err);
 
 // Device name, compute capability and memory; false if no CUDA device.
 bool gpu_info(std::string& desc, size_t& freeBytes, size_t& totalBytes);

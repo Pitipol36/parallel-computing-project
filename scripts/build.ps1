@@ -1,9 +1,11 @@
 # Configure and build (Release) with Ninja inside a Visual Studio developer environment.
-#   powershell -ExecutionPolicy Bypass -File scripts\build.ps1 [-Clean]
-param([switch]$Clean)
+#   powershell -ExecutionPolicy Bypass -File scripts\build.ps1 [-Clean] [-Stats]
+#   -Stats builds into build-stats\ with per-ray traversal counters (RT_TRAVERSAL_STATS);
+#   use that build only for counting, never for timing.
+param([switch]$Clean, [switch]$Stats)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$build = Join-Path $root "build"
+$build = Join-Path $root $(if ($Stats) { "build-stats" } else { "build" })
 if ($Clean -and (Test-Path $build)) { Remove-Item -Recurse -Force $build }
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -17,7 +19,7 @@ cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
     if ($_ -match "^([^=]+)=(.*)$") { Set-Item -Path "env:$($matches[1])" -Value $matches[2] }
 }
 
-cmake -S $root -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake -S $root -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DRT_TRAVERSAL_STATS=$(if ($Stats) { "ON" } else { "OFF" })"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cmake --build $build
 exit $LASTEXITCODE

@@ -13,6 +13,7 @@
 #include <string>
 
 #include "render.h"
+#include "builders.h"
 #include "trace.h"
 
 namespace {
@@ -249,6 +250,86 @@ size_t gpu_bytes_needed(const BVH& bvh, const Mesh& mesh, GpuMode mode, int widt
     }
 }
 
+// Tracers for an uploaded scene; only the one matching the mode is used.
+struct DeviceScene {
+    BruteTracer brute{};
+    NaiveTracer naive{};
+    BvhTracer bvh{nullptr, nullptr};
+};
+
+// Launches the mode's kernel(s) on an uploaded scene, times them, downloads the image.
+static bool launch_and_download(GpuMode mode, DeviceScene scene, const ShadeParams& sp, const GpuLaunch& launch,
+                                uint32_t* out, int* ids, std::vector<uint32_t>& pixels, std::vector<int>* hitIds,
+                                GpuTimings& tm, std::string& err) {
+    const int W = sp.cam.width, H = sp.cam.height;
+    const size_t px = size_t(W) * H;
+    cudaEvent_t ev0, ev1;
+    CU(cudaEventCreate(&ev0));
+    CU(cudaEventCreate(&ev1));
+    struct EvGuard { cudaEvent_t a, b; ~EvGuard() { cudaEventDestroy(a); cudaEventDestroy(b); } } evg{ev0, ev1};
+    DevBuf dCounter, dStats;
+#ifdef RT_TRAVERSAL_STATS
+    CU(dStats.alloc(sizeof(TraversalStats)));
+    CU(cudaMemset(dStats.p, 0, sizeof(TraversalStats)));
+    scene.bvh.stats = dStats.as<TraversalStats>();
+#endif
+
+    dim3 block(launch.blockX, launch.blockY);
+    auto grid_for = [&](int rows) { return dim3((W + block.x - 1) / block.x, (rows + block.y - 1) / block.y); };
+
+    CU(cudaEventRecord(ev0));
+    switch (mode) {
+        case GpuMode::Brute: {
+            int step = launch.bruteRowsPerLaunch > 0 ? launch.bruteRowsPerLaunch : H;
+            for (int y0 = 0; y0 < H; y0 += step) {
+                int y1 = y0 + step < H ? y0 + step : H;
+                k_per_pixel<<<grid_for(y1 - y0), block>>>(scene.brute, sp, y0, y1, out, ids);
+            }
+            break;
+        }
+        case GpuMode::BvhNaive:
+            k_per_pixel<<<grid_for(H), block>>>(scene.naive, sp, 0, H, out, ids);
+            break;
+        case GpuMode::BvhOpt:
+            k_per_pixel<<<grid_for(H), block>>>(scene.bvh, sp, 0, H, out, ids);
+            break;
+        case GpuMode::Persistent: {
+            int threads = launch.blockX * launch.blockY;
+            threads = (threads + 31) / 32 * 32;
+            int perSM = 0, dev = 0, sms = 0;
+            CU(cudaGetDevice(&dev));
+            CU(cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev));
+            CU(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&perSM, k_persistent, threads, 0));
+            int tilesX = (W + TILE_W - 1) / TILE_W, tilesY = (H + TILE_H - 1) / TILE_H;
+            CU(dCounter.alloc(sizeof(int)));
+            CU(cudaMemsetAsync(dCounter.p, 0, sizeof(int)));
+            k_persistent<<<sms * (perSM > 0 ? perSM : 1), threads>>>(scene.bvh, sp, tilesX, tilesX * tilesY,
+                                                                     dCounter.as<int>(), out, ids);
+            break;
+        }
+    }
+    CU(cudaGetLastError());
+    CU(cudaEventRecord(ev1));
+    CU(cudaEventSynchronize(ev1));
+    float kms = 0;
+    CU(cudaEventElapsedTime(&kms, ev0, ev1));
+    tm.kernelMs = kms;
+#ifdef RT_TRAVERSAL_STATS
+    if (mode == GpuMode::BvhOpt || mode == GpuMode::Persistent)
+        CU(cudaMemcpy(&tm.stats, dStats.p, sizeof(TraversalStats), cudaMemcpyDeviceToHost));
+#endif
+
+    auto tDown = Clock::now();
+    pixels.resize(px);
+    CU(cudaMemcpy(pixels.data(), out, px * 4, cudaMemcpyDeviceToHost));
+    if (hitIds) {
+        hitIds->resize(px);
+        CU(cudaMemcpy(hitIds->data(), ids, px * 4, cudaMemcpyDeviceToHost));
+    }
+    tm.downloadMs = ms_since(tDown);
+    return true;
+}
+
 bool render_gpu(const BVH& bvh, const Mesh& mesh, GpuMode mode, const ShadeParams& sp,
                 const GpuLaunch& launch, std::vector<uint32_t>& pixels, std::vector<int>* hitIds,
                 GpuTimings& tm, std::string& err) {
@@ -271,26 +352,25 @@ bool render_gpu(const BVH& bvh, const Mesh& mesh, GpuMode mode, const ShadeParam
         for (size_t i = 0; i < bvh.tris.size(); ++i) orderedFaces[i] = mesh.faces[bvh.triOrder[i]];
     }
 
-    cudaEvent_t ev0, ev1;
-    CU(cudaEventCreate(&ev0));
-    CU(cudaEventCreate(&ev1));
-    struct EvGuard { cudaEvent_t a, b; ~EvGuard() { cudaEventDestroy(a); cudaEventDestroy(b); } } evg{ev0, ev1};
-
     auto tStart = Clock::now();
-    DevBuf dNodes, dTris, dVerts, dFaces, dIds, dOut, dHit, dCounter;
+    DevBuf dNodes, dTris, dVerts, dFaces, dIds, dOut, dHit;
+    DeviceScene scene;
     switch (mode) {
         case GpuMode::Brute:
             CU(dTris.upload(bvh.tris.data(), bvh.tris.size() * sizeof(Tri)));
+            scene.brute = BruteTracer{dTris.as<f4>(), int(bvh.tris.size())};
             break;
         case GpuMode::BvhNaive:
             CU(dNodes.upload(aos.data(), aos.size() * sizeof(NodeAoS)));
             CU(dVerts.upload(mesh.vertices.data(), mesh.vertices.size() * sizeof(vec3)));
             CU(dFaces.upload(orderedFaces.data(), orderedFaces.size() * sizeof(Face)));
             CU(dIds.upload(bvh.triOrder.data(), bvh.triOrder.size() * sizeof(uint32_t)));
+            scene.naive = NaiveTracer{dNodes.as<NodeAoS>(), dVerts.as<vec3>(), dFaces.as<Face>(), dIds.as<uint32_t>()};
             break;
         default:
             CU(dNodes.upload(bvh.nodes.data(), bvh.nodes.size() * sizeof(BVHNode)));
             CU(dTris.upload(bvh.tris.data(), bvh.tris.size() * sizeof(Tri)));
+            scene.bvh = BvhTracer{dNodes.as<f4>(), dTris.as<f4>()};
             break;
     }
     CU(dOut.alloc(px * 4));
@@ -298,65 +378,34 @@ bool render_gpu(const BVH& bvh, const Mesh& mesh, GpuMode mode, const ShadeParam
     CU(cudaDeviceSynchronize());
     tm.uploadMs = ms_since(tStart);
 
-    uint32_t* out = dOut.as<uint32_t>();
-    int* ids = hitIds ? dHit.as<int>() : nullptr;
-    dim3 block(launch.blockX, launch.blockY);
-    auto grid_for = [&](int rows) { return dim3((W + block.x - 1) / block.x, (rows + block.y - 1) / block.y); };
+    if (!launch_and_download(mode, scene, sp, launch, dOut.as<uint32_t>(), hitIds ? dHit.as<int>() : nullptr, pixels,
+                             hitIds, tm, err))
+        return false;
 
-    CU(cudaEventRecord(ev0));
-    switch (mode) {
-        case GpuMode::Brute: {
-            BruteTracer tr{dTris.as<f4>(), int(bvh.tris.size())};
-            int step = launch.bruteRowsPerLaunch > 0 ? launch.bruteRowsPerLaunch : H;
-            for (int y0 = 0; y0 < H; y0 += step) {
-                int y1 = y0 + step < H ? y0 + step : H;
-                k_per_pixel<<<grid_for(y1 - y0), block>>>(tr, sp, y0, y1, out, ids);
-            }
-            break;
-        }
-        case GpuMode::BvhNaive: {
-            NaiveTracer tr{dNodes.as<NodeAoS>(), dVerts.as<vec3>(), dFaces.as<Face>(), dIds.as<uint32_t>()};
-            k_per_pixel<<<grid_for(H), block>>>(tr, sp, 0, H, out, ids);
-            break;
-        }
-        case GpuMode::BvhOpt: {
-            BvhTracer tr{dNodes.as<f4>(), dTris.as<f4>()};
-            k_per_pixel<<<grid_for(H), block>>>(tr, sp, 0, H, out, ids);
-            break;
-        }
-        case GpuMode::Persistent: {
-            BvhTracer tr{dNodes.as<f4>(), dTris.as<f4>()};
-            int threads = launch.blockX * launch.blockY;
-            threads = (threads + 31) / 32 * 32;
-            int perSM = 0, dev = 0, sms = 0;
-            CU(cudaGetDevice(&dev));
-            CU(cudaDeviceGetAttribute(&sms, cudaDevAttrMultiProcessorCount, dev));
-            CU(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&perSM, k_persistent, threads, 0));
-            int tilesX = (W + TILE_W - 1) / TILE_W, tilesY = (H + TILE_H - 1) / TILE_H;
-            CU(dCounter.alloc(sizeof(int)));
-            CU(cudaMemsetAsync(dCounter.p, 0, sizeof(int)));
-            k_persistent<<<sms * (perSM > 0 ? perSM : 1), threads>>>(tr, sp, tilesX, tilesX * tilesY,
-                                                                     dCounter.as<int>(), out, ids);
-            break;
-        }
+    for (DevBuf* b : {&dNodes, &dTris, &dVerts, &dFaces, &dIds, &dOut, &dHit}) b->release();
+    tm.e2eMs = ms_since(tStart);
+    return true;
+}
+
+bool render_gpu_resident(const DeviceBvh& dbvh, GpuMode mode, const ShadeParams& sp, const GpuLaunch& launch,
+                         std::vector<uint32_t>& pixels, std::vector<int>* hitIds, GpuTimings& tm, std::string& err) {
+    if (mode != GpuMode::BvhOpt && mode != GpuMode::Persistent) {
+        err = std::string(gpu_mode_name(mode)) + " needs the host tree (use render_gpu)";
+        return false;
     }
-    CU(cudaGetLastError());
-    CU(cudaEventRecord(ev1));
-    CU(cudaEventSynchronize(ev1));
-    float kms = 0;
-    CU(cudaEventElapsedTime(&kms, ev0, ev1));
-    tm.kernelMs = kms;
-
-    auto tDown = Clock::now();
-    pixels.resize(px);
-    CU(cudaMemcpy(pixels.data(), out, px * 4, cudaMemcpyDeviceToHost));
-    if (hitIds) {
-        hitIds->resize(px);
-        CU(cudaMemcpy(hitIds->data(), ids, px * 4, cudaMemcpyDeviceToHost));
-    }
-    tm.downloadMs = ms_since(tDown);
-
-    for (DevBuf* b : {&dNodes, &dTris, &dVerts, &dFaces, &dIds, &dOut, &dHit, &dCounter}) b->release();
+    const size_t px = size_t(sp.cam.width) * sp.cam.height;
+    auto tStart = Clock::now();
+    DevBuf dOut, dHit;
+    CU(dOut.alloc(px * 4));
+    if (hitIds) CU(dHit.alloc(px * 4));
+    tm.uploadMs = ms_since(tStart);  // no scene upload: the tree is already on the device
+    DeviceScene scene;
+    scene.bvh = BvhTracer{static_cast<const f4*>(dbvh.nodes), static_cast<const f4*>(dbvh.tris)};
+    if (!launch_and_download(mode, scene, sp, launch, dOut.as<uint32_t>(), hitIds ? dHit.as<int>() : nullptr, pixels,
+                             hitIds, tm, err))
+        return false;
+    dOut.release();
+    dHit.release();
     tm.e2eMs = ms_since(tStart);
     return true;
 }

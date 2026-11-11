@@ -16,6 +16,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 option(RT_PTXAS_VERBOSE "Print register/local-memory usage of each kernel" OFF)
+option(RT_TRAVERSAL_STATS "Count box and triangle tests per ray (slower; not for timing runs)" OFF)
 
 # Host code: best single-thread code generation. No fast-math anywhere, so the CPU and
 # GPU results can be compared pixel for pixel.
@@ -30,6 +31,10 @@ add_library(rt_core STATIC
   src/mesh.cpp
   src/ply_loader.cpp
   src/bvh_build.cpp
+  src/bvh_build_lbvh_cpu.cpp
+  src/bvh_build_lbvh_gpu.cu
+  src/bvh_convert_cpu.cpp
+  src/builders.cpp
   src/camera.cpp
   src/render_cpu.cpp
   src/render_gpu.cu
@@ -41,12 +46,17 @@ target_compile_options(rt_core PUBLIC
   $<$<COMPILE_LANGUAGE:CXX>:${RT_CXX_OPT}>
   $<$<COMPILE_LANGUAGE:CUDA>:-O3 -lineinfo --expt-relaxed-constexpr>
 )
+if(RT_TRAVERSAL_STATS)
+  target_compile_definitions(rt_core PUBLIC RT_TRAVERSAL_STATS)
+endif()
 if(RT_PTXAS_VERBOSE)
   target_compile_options(rt_core PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v>)
 endif()
 if(MSVC)
   # Pass the host optimisation flags through nvcc to cl as well.
   target_compile_options(rt_core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/O2>)
+  # CUB (CCCL) requires the standard-conforming MSVC preprocessor.
+  target_compile_options(rt_core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>)
 endif()
 
 add_executable(raytracer src/main.cpp)

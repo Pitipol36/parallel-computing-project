@@ -4,6 +4,10 @@
 #include <filesystem>
 #include <limits>
 
+#include <algorithm>
+
+#include "builders.h"
+#include "morton.h"
 #include "ply_loader.h"
 #include "render.h"
 #include "trace.h"
@@ -65,9 +69,15 @@ bool brute_closest(const BVH& bvh, const Ray& r, Hit& h) {
     return h.prim >= 0;
 }
 
+void check_bvh(const Mesh& mesh, const BVH& bvh);
+
 void test_bvh(const char* name, const Mesh& mesh, BuildParams bp) {
     std::printf("  BVH on %s (%zu tris, bins=%d, leaf=%d)\n", name, mesh.faces.size(), bp.bins, bp.maxLeaf);
-    BVH bvh = build_bvh(mesh, bp);
+    check_bvh(mesh, build_bvh(mesh, bp));
+}
+
+// Structure check plus random rays against brute force, for a tree from any builder.
+void check_bvh(const Mesh& mesh, const BVH& bvh) {
     std::string rep;
     bool ok = validate_bvh(bvh, rep);
     if (!ok) std::printf("%s", rep.c_str());
@@ -146,6 +156,178 @@ void test_rng() {
     check(fabs(mean - 2.0 / 3.0) < 0.03, "AO directions are cosine distributed (mean cos ~ 2/3)");
 }
 
+// ---------------------------------------------------------------- LBVH
+
+void test_morton() {
+    std::printf("  Morton codes\n");
+    check(morton_expand21(0) == 0 && morton_expand21(1) == 1 && morton_expand21(2) == 8 && morton_expand21(3) == 9,
+          "expand21 small values");
+    check(morton_expand21(0x1fffff) == 0x1249249249249249ULL, "expand21 all 21 bits");
+    check(morton_expand21(0xffffffffu) == 0x1249249249249249ULL, "expand21 ignores bits above 21");
+    check(morton3d(1, 0, 0) == 4 && morton3d(0, 1, 0) == 2 && morton3d(0, 0, 1) == 1, "x, y, z bit order");
+    check(morton3d(0x1fffff, 0x1fffff, 0x1fffff) == 0x7fffffffffffffffULL, "63-bit maximum");
+    check(quantize21(-5.0f, 0.0f, 1.0f) == 0 && quantize21(7.0f, 0.0f, 1.0f) == 2097151u, "quantize clamps");
+    check(quantize21(0.5f, 0.0f, 1.0f) == 1048576u, "quantize midpoint");
+    check(quantize21(3.0f, 3.0f, 0.0f) == 0, "flat axis maps to 0");
+    MortonFrame f = make_morton_frame({{0, 0, 0}, {2, 4, 0}});
+    check(f.inv.x == 0.5f && f.inv.y == 0.25f && f.inv.z == 0.0f, "frame reciprocal extents");
+}
+
+void test_lbvh_delta() {
+    std::printf("  LBVH delta with duplicate keys\n");
+    const uint64_t keys[4] = {5, 5, 5, 9};
+    check(lbvh_delta(keys, 4, 0, -1) == -1 && lbvh_delta(keys, 4, 3, 4) == -1, "out of range is -1");
+    check(lbvh_delta(keys, 4, 0, 3) == clz64(5 ^ 9), "different keys use the key prefix");
+    check(lbvh_delta(keys, 4, 0, 1) == 64 + 31 && lbvh_delta(keys, 4, 0, 2) == 64 + 30,
+          "equal keys fall back to 64 + index prefix");
+    check(lbvh_delta(keys, 4, 1, 2) == 64 + 30, "index prefix of 1 and 2");
+    check(lbvh_delta(keys, 4, 0, 1) > lbvh_delta(keys, 4, 0, 3), "duplicates bind tighter than distinct keys");
+}
+
+struct RefNode { int first, last, split; };
+
+// Independent top-down construction (Karras, "Thinking Parallel III"): the split of a range
+// is the highest position where the common prefix with the first key changes.
+void ref_build(const uint64_t* keys, int n, int first, int last, std::vector<RefNode>& out) {
+    if (first == last) return;
+    const int common = lbvh_delta(keys, n, first, last);
+    int split = first, step = last - first;
+    do {
+        step = (step + 1) >> 1;
+        int ns = split + step;
+        if (ns < last && lbvh_delta(keys, n, first, ns) > common) split = ns;
+    } while (step > 1);
+    out.push_back({first, last, split});
+    ref_build(keys, n, first, split, out);
+    ref_build(keys, n, split + 1, last, out);
+}
+
+// Builds the Karras tree for sorted keys and checks it against the top-down reference:
+// every internal node's range and split must appear in the reference, and vice versa.
+bool karras_matches_reference(const std::vector<uint64_t>& keys) {
+    const int n = int(keys.size());
+    std::vector<int> left(n - 1), right(n - 1), first(2 * n - 1), last(2 * n - 1), parent(2 * n - 1, -1);
+    for (int i = 0; i < n - 1; ++i) {
+        lbvh_internal_node(keys.data(), n, i, left[i], right[i]);
+        parent[left[i]] = i;
+        parent[right[i]] = i;
+    }
+    for (int k = 0; k < n; ++k) first[n - 1 + k] = last[n - 1 + k] = k;
+    // Ranges bottom-up: post-order from the root.
+    std::vector<std::pair<int, bool>> st = {{0, false}};
+    int visitedInternal = 0;
+    while (!st.empty()) {
+        auto [x, done] = st.back();
+        st.pop_back();
+        if (x >= n - 1) continue;
+        if (!done) {
+            ++visitedInternal;
+            st.push_back({x, true});
+            st.push_back({left[x], false});
+            st.push_back({right[x], false});
+        } else {
+            first[x] = first[left[x]];
+            last[x] = last[right[x]];
+            if (last[left[x]] + 1 != first[right[x]]) return false;  // children must be adjacent
+        }
+    }
+    if (visitedInternal != n - 1) return false;  // every internal node reachable from the root
+    for (int x = 1; x < 2 * n - 1; ++x)
+        if (parent[x] < 0) return false;
+    std::vector<RefNode> ref;
+    ref_build(keys.data(), n, 0, n - 1, ref);
+    if (int(ref.size()) != n - 1) return false;
+    std::vector<std::pair<int, int>> mine, theirs;
+    for (int i = 0; i < n - 1; ++i) mine.push_back({first[i] * 100003 + last[i], last[left[i]]});
+    for (const RefNode& r : ref) theirs.push_back({r.first * 100003 + r.last, r.split});
+    std::sort(mine.begin(), mine.end());
+    std::sort(theirs.begin(), theirs.end());
+    return mine == theirs;
+}
+
+void test_lbvh_hierarchy() {
+    std::printf("  LBVH hierarchy (hand-checked and against a top-down reference)\n");
+    {   // n = 2: root with two leaves.
+        const uint64_t k[2] = {1, 2};
+        int l, r;
+        lbvh_internal_node(k, 2, 0, l, r);
+        check(l == 1 && r == 2, "n=2: root -> leaf 0, leaf 1");
+    }
+    {   // n = 3, keys 001 010 100: root splits off leaf 2; internal node 1 holds leaves 0 and 1.
+        const uint64_t k[3] = {1, 2, 4};
+        int l0, r0, l1, r1;
+        lbvh_internal_node(k, 3, 0, l0, r0);
+        lbvh_internal_node(k, 3, 1, l1, r1);
+        check(l0 == 1 && r0 == 2 + 2, "n=3: root -> internal 1, leaf 2");
+        check(l1 == 2 + 0 && r1 == 2 + 1, "n=3: internal 1 -> leaf 0, leaf 1");
+    }
+    {   // n = 4, all keys identical: the index fallback gives a balanced tree.
+        const uint64_t k[4] = {7, 7, 7, 7};
+        int l0, r0, l1, r1, l2, r2;
+        lbvh_internal_node(k, 4, 0, l0, r0);
+        lbvh_internal_node(k, 4, 1, l1, r1);
+        lbvh_internal_node(k, 4, 2, l2, r2);
+        check(l0 == 1 && r0 == 2, "identical keys: root -> internal 1, internal 2");
+        check(l1 == 3 && r1 == 4 && l2 == 5 && r2 == 6, "identical keys: leaves paired by index");
+    }
+    // n = 8 hand-checkable, then random keys with many duplicates.
+    check(karras_matches_reference({0, 1, 2, 3, 4, 5, 6, 7}), "n=8 consecutive keys");
+    check(karras_matches_reference({3, 3, 3, 3, 3, 3, 3, 3}), "n=8 identical keys");
+    bool ok = true;
+    for (int trial = 0; trial < 60 && ok; ++trial) {
+        int n = trial < 20 ? 2 + trial : 50 + 37 * trial;
+        Rng rng = make_rng(uint32_t(trial), 11, 3);
+        std::vector<uint64_t> keys(n);
+        uint64_t range = trial % 3 == 0 ? 4 : (trial % 3 == 1 ? 1000 : (1ull << 62));
+        for (auto& k : keys) k = uint64_t(double(rng.next()) * double(range));
+        std::sort(keys.begin(), keys.end());
+        ok = karras_matches_reference(keys);
+        if (!ok) std::printf("    mismatch at trial %d (n=%d)\n", trial, n);
+    }
+    check(ok, "random sorted keys (with duplicates) match the reference");
+}
+
+void test_lbvh_builders() {
+    std::string gdesc, err;
+    size_t fb, tb;
+    const bool gpu = gpu_info(gdesc, fb, tb);
+    struct Case { const char* name; Mesh mesh; int leaf; };
+    std::vector<Case> cases;
+    cases.push_back({"icosphere(4)", make_icosphere(4), 4});
+    cases.push_back({"test scene", make_test_scene(3), 2});
+    cases.push_back({"icosphere(5)", make_icosphere(5), 8});
+    Mesh one;
+    one.vertices = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+    one.faces = {{0, 1, 2}};
+    cases.push_back({"single triangle", one, 4});
+    Mesh dup = make_icosphere(2);  // the same triangles twice: duplicate Morton codes
+    size_t nf = dup.faces.size();
+    for (size_t i = 0; i < nf; ++i) dup.faces.push_back(dup.faces[i]);
+    cases.push_back({"duplicated icosphere(2)", dup, 4});
+    for (Case& c : cases) {
+        BuildParams bp;
+        bp.maxLeaf = c.leaf;
+        std::printf("  LBVH on %s (%zu tris, leaf=%d)\n", c.name, c.mesh.faces.size(), c.leaf);
+        BVH cpu = build_lbvh_cpu(c.mesh, bp, nullptr);
+        if (c.mesh.faces.size() > 1) check_bvh(c.mesh, cpu);
+        else {
+            std::string rep;
+            check(validate_bvh(cpu, rep), "single-triangle LBVH is valid");
+        }
+        if (!gpu) continue;
+        BVH g;
+        BuildReport rep;
+        bool built = build_lbvh_gpu(c.mesh, bp, &g, nullptr, &rep, err);
+        if (!built) std::printf("    %s\n", err.c_str());
+        check(built, "GPU LBVH builds");
+        std::string why;
+        bool same = built && same_bvh(cpu, g, why);
+        if (built && !same) std::printf("    %s\n", why.c_str());
+        check(same, "GPU LBVH is node-for-node identical to the CPU LBVH");
+        check(!built || (g.maxDepth == cpu.maxDepth && g.leafCount == cpu.leafCount), "GPU depth and leaf count match");
+    }
+}
+
 }  // namespace
 
 int run_unit_tests() {
@@ -159,6 +341,10 @@ int run_unit_tests() {
     test_bvh("icosphere(5)", make_icosphere(5), BuildParams{8, 8});
     test_ply();
     test_rng();
+    test_morton();
+    test_lbvh_delta();
+    test_lbvh_hierarchy();
+    test_lbvh_builders();
     std::printf("Unit tests: %d/%d checks passed -> %s\n", g_checks - g_failures, g_checks,
                 g_failures ? "FAIL" : "PASS");
     return g_failures;

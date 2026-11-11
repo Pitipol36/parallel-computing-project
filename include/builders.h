@@ -1,0 +1,64 @@
+// BVH builders selectable with --build, their stage timings, and tree-quality metrics.
+//   cpu_sah   binned SAH, single-threaded (bvh_build.cpp): the quality reference
+//   cpu_lbvh  Karras 2012 LBVH, single-threaded: the apples-to-apples build baseline
+//   gpu_lbvh  the same LBVH as CUDA kernels; node-for-node identical to cpu_lbvh
+// Every builder emits the same flattened BVH (BVHNode + Tri), so all render modes run
+// unchanged on any tree.
+#pragma once
+
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "bvh.h"
+#include "mesh.h"
+
+enum class BuilderKind { CpuSah, CpuLbvh, GpuLbvh };
+
+const char* builder_name(BuilderKind b);
+bool parse_builder(const std::string& s, BuilderKind& b);
+
+struct BuildReport {
+    std::vector<std::pair<std::string, double>> stages;  // per-stage time in ms, in order
+    double buildMs = 0;     // total build time (GPU: sum of kernel stages, cudaEvent timed)
+    double uploadMs = 0;    // GPU: mesh upload before the build
+    double downloadMs = 0;  // GPU: copying the finished tree back to the host
+};
+
+// A finished BVH resident on the GPU, in the render kernels' format.
+struct DeviceBvh {
+    void* nodes = nullptr;     // BVHNode[numNodes]
+    void* tris = nullptr;      // Tri[numTris]
+    void* triOrder = nullptr;  // uint32_t[numTris]
+    uint32_t numNodes = 0, numTris = 0;
+    int maxDepth = 0;
+    int leafCount = 0;
+    void release();
+};
+
+BVH build_lbvh_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);
+
+// GPU LBVH. hostOut (optional) receives a host copy of the tree; devOut (optional) keeps the
+// device-resident tree (caller releases it). At least one must be given.
+bool build_lbvh_gpu(const Mesh& mesh, const BuildParams& params, BVH* hostOut, DeviceBvh* devOut,
+                    BuildReport* report, std::string& err);
+
+// Builds with any builder into a host BVH (GPU builders download the tree).
+bool build_with(BuilderKind kind, const Mesh& mesh, const BuildParams& params, BVH& out, BuildReport& report,
+                std::string& err);
+
+// ---- tree quality ----
+constexpr float SAH_C_TRAV = 1.2f;   // cost of visiting an interior node
+constexpr float SAH_C_ISECT = 1.0f;  // cost of one ray-triangle test
+
+struct TreeStats {
+    double sahCost = 0;  // [C_trav * sum SA(interior) + C_isect * sum SA(leaf) * N(leaf)] / SA(root)
+    size_t nodes = 0, interior = 0, leaves = 0;
+    int maxDepth = 0;
+    double avgLeafSize = 0;
+};
+
+TreeStats tree_stats(const BVH& bvh, float cTrav = SAH_C_TRAV, float cIsect = SAH_C_ISECT);
+
+// True when two BVHs are bit-for-bit identical (nodes, triangles and order).
+bool same_bvh(const BVH& a, const BVH& b, std::string& why);

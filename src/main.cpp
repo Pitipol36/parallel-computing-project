@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "builders.h"
 #include "bvh.h"
 #include "camera.h"
 #include "ply_loader.h"
@@ -42,6 +43,10 @@ struct Options {
     bool validate = false;
     bool force = false;
     std::string dataDir = "data";
+    std::vector<std::string> builders = {"cpu_sah"};
+    bool buildBench = false;
+    std::string buildCsv;
+    std::string statsCsv;
 };
 
 void usage() {
@@ -62,6 +67,12 @@ void usage() {
         "  --out FILE.png      write the image (one file per mode: FILE_<mode>.png)\n"
         "  --csv FILE          append timing rows to a CSV file\n"
         "  --bins N --leaf N   SAH bins per axis (16) and max leaf size (4)\n"
+        "  --build LIST        BVH builder: cpu_sah (default), cpu_lbvh, gpu_lbvh; a comma list\n"
+        "                      with --build-bench\n"
+        "  --build-bench       time each --build builder (--warmup/--runs, median per stage),\n"
+        "                      print tree quality, append to --build-csv; no rendering\n"
+        "  --build-csv FILE    CSV for --build-bench rows (default results/build.csv)\n"
+        "  --stats-csv FILE    append traversal counters per mode (RT_TRAVERSAL_STATS builds only)\n"
         "  --yaw D --pitch D --fov D   camera orbit angles and field of view (25, 15, 35)\n"
         "  --up y|z            model up axis (default y)\n"
         "  --brute-rows N      rows per gpu_brute launch (default 8; keeps launches under the\n"
@@ -118,6 +129,10 @@ bool parse_args(int argc, char** argv, Options& o) {
         else if (a == "--validate") o.validate = true;
         else if (a == "--verify") o.verify = true;
         else if (a == "--data-dir") o.dataDir = next();
+        else if (a == "--build") o.builders = split(next(), ',');
+        else if (a == "--build-bench") o.buildBench = true;
+        else if (a == "--build-csv") o.buildCsv = next();
+        else if (a == "--stats-csv") o.statsCsv = next();
         else if (a == "-h" || a == "--help") { usage(); std::exit(0); }
         else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); usage(); return false; }
     }
@@ -133,7 +148,42 @@ bool parse_args(int argc, char** argv, Options& o) {
         }
     }
     o.modes = expanded;
+    for (const std::string& b : o.builders) {
+        BuilderKind bk;
+        if (!parse_builder(b, bk)) { std::fprintf(stderr, "unknown builder %s\n", b.c_str()); return false; }
+    }
+    if (o.builders.empty()) o.builders = {"cpu_sah"};
+    if (o.builders.size() > 1 && !o.buildBench) {
+        std::fprintf(stderr, "--build takes one builder unless --build-bench is given\n");
+        return false;
+    }
     return true;
+}
+
+BuilderKind builder_of(const std::string& s) {
+    BuilderKind b = BuilderKind::CpuSah;
+    parse_builder(s, b);
+    return b;
+}
+
+std::string stage_list(const BuildReport& r) {
+    std::string s;
+    char buf[64];
+    for (auto& st : r.stages) {
+        std::snprintf(buf, sizeof(buf), "%s%s %.2f", s.empty() ? "" : ", ", st.first.c_str(), st.second);
+        s += buf;
+    }
+    return s;
+}
+
+void print_tree(const char* builder, const BVH& bvh, const BuildReport& r) {
+    TreeStats ts = tree_stats(bvh);
+    std::printf("BVH (%s): %zu nodes, %zu leaves (avg %.2f tris), depth %d, SAH cost %.2f, built in %.2f ms\n",
+                builder, ts.nodes, ts.leaves, ts.avgLeafSize, ts.maxDepth, ts.sahCost, r.buildMs);
+    std::printf("  stages (ms): %s", stage_list(r).c_str());
+    if (r.uploadMs > 0 || r.downloadMs > 0)
+        std::printf("; mesh upload %.2f, tree download %.2f", r.uploadMs, r.downloadMs);
+    std::printf("\n");
 }
 
 double median(std::vector<double> v) {
@@ -179,9 +229,16 @@ int run_benchmark(const Options& o) {
     if (!load_scene(o.model, mesh)) return 1;
     std::string label = o.label.empty() ? (o.model.empty() ? "testscene" : fs::path(o.model).stem().string()) : o.label;
 
-    BVH bvh = build_bvh(mesh, o.bp);
-    std::printf("BVH: %zu nodes, %d leaves, depth %d, built in %.1f ms (binned SAH, %d bins, leaf %d)\n",
-                bvh.nodes.size(), bvh.leafCount, bvh.maxDepth, bvh.buildMs, o.bp.bins, o.bp.maxLeaf);
+    BVH bvh;
+    BuildReport br;
+    {
+        std::string err;
+        if (!build_with(builder_of(o.builders[0]), mesh, o.bp, bvh, br, err)) {
+            std::fprintf(stderr, "build failed: %s\n", err.c_str());
+            return 1;
+        }
+        print_tree(o.builders[0].c_str(), bvh, br);
+    }
     if (o.validate) {
         std::string rep;
         bool ok = validate_bvh(bvh, rep);
@@ -213,11 +270,12 @@ int run_benchmark(const Options& o) {
     for (const std::string& m : o.modes) {
         std::vector<uint32_t> pixels;
         std::vector<double> kern, e2e, up, down;
+        TraversalStats stats{};
         char block[32] = "-";
         if (m == "cpu") {
             int runs = o.cpuRuns > 0 ? o.cpuRuns : o.runs;
             for (int r = 0; r < o.warmup + runs; ++r) {
-                double ms = render_cpu(bvh, sp, pixels, nullptr);
+                double ms = render_cpu(bvh, sp, pixels, nullptr, &stats);
                 if (r >= o.warmup) { kern.push_back(ms); e2e.push_back(ms); up.push_back(0); down.push_back(0); }
             }
         } else {
@@ -244,6 +302,7 @@ int run_benchmark(const Options& o) {
                 if (ok && r >= o.warmup) {
                     kern.push_back(tm.kernelMs); e2e.push_back(tm.e2eMs);
                     up.push_back(tm.uploadMs); down.push_back(tm.downloadMs);
+                    stats = tm.stats;
                 }
             }
             if (!ok) { ++failures; continue; }
@@ -254,6 +313,19 @@ int run_benchmark(const Options& o) {
         char speed[32] = "";
         if (cpuMs > 0 && m != "cpu") std::snprintf(speed, sizeof(speed), "%.1fx", cpuMs / k);
         std::printf("%-20s %12.2f %12.2f %12.1f %10s\n", m.c_str(), k, e, mrays, speed);
+        if (stats.rays > 0) {
+            const double bpr = double(stats.boxTests) / double(stats.rays), tpr = double(stats.triTests) / double(stats.rays);
+            std::printf("  traversal: %.0f rays traced, %.2f box tests and %.2f triangle tests per ray\n",
+                        double(stats.rays), bpr, tpr);
+            if (!o.statsCsv.empty()) {
+                bool exists = fs::exists(o.statsCsv);
+                std::ofstream sc(o.statsCsv, std::ios::app);
+                if (!exists) sc << "experiment,model,tris,builder,mode,width,height,ao,rays,box_tests_per_ray,tri_tests_per_ray\n";
+                sc << o.tag << "," << label << "," << mesh.faces.size() << "," << o.builders[0] << "," << m << ","
+                   << o.rp.width << "," << o.rp.height << "," << o.rp.aoSamples << "," << stats.rays << "," << bpr
+                   << "," << tpr << "\n";
+            }
+        }
         if (csv.is_open())
             csv << o.tag << "," << label << "," << mesh.faces.size() << "," << o.rp.width << "," << o.rp.height << ","
                 << o.rp.aoSamples << "," << m << "," << block << "," << kern.size() << "," << bvh.buildMs << ","
@@ -263,6 +335,64 @@ int run_benchmark(const Options& o) {
             if (fs::path(p).has_parent_path()) fs::create_directories(fs::path(p).parent_path());
             if (!write_png(p, o.rp.width, o.rp.height, pixels)) std::printf("  could not write %s\n", p.c_str());
         }
+    }
+    return failures ? 1 : 0;
+}
+
+// ---------------------------------------------------------------- build benchmark
+
+int run_build_bench(const Options& o) {
+    Mesh mesh;
+    if (!load_scene(o.model, mesh)) return 1;
+    std::string label = o.label.empty() ? (o.model.empty() ? "testscene" : fs::path(o.model).stem().string()) : o.label;
+    const std::string csvPath = o.buildCsv.empty() ? "results/build.csv" : o.buildCsv;
+    bool exists = fs::exists(csvPath);
+    if (fs::path(csvPath).has_parent_path()) fs::create_directories(fs::path(csvPath).parent_path());
+    std::ofstream csv(csvPath, std::ios::app);
+    const char* stageNames[] = {"bounds", "morton", "sort", "hierarchy", "fit", "convert"};
+    if (!exists) {
+        csv << "experiment,model,tris,builder,leaf,runs,build_ms,upload_ms,download_ms";
+        for (const char* s : stageNames) csv << "," << s << "_ms";
+        csv << ",sah_cost,nodes,leaves,max_depth,avg_leaf\n";
+    }
+    std::printf("%-10s %10s %10s %10s %8s %8s\n", "builder", "build ms", "upload ms", "SAH cost", "depth", "leaves");
+    int failures = 0;
+    for (const std::string& b : o.builders) {
+        BuilderKind bk = builder_of(b);
+        std::vector<double> total, upload, download;
+        std::vector<std::vector<double>> stage(6);
+        BVH bvh;
+        bool ok = true;
+        for (int r = 0; r < o.warmup + o.runs && ok; ++r) {
+            BuildReport rep;
+            std::string err;
+            ok = build_with(bk, mesh, o.bp, bvh, rep, err);
+            if (!ok) { std::printf("%-10s FAILED: %s\n", b.c_str(), err.c_str()); break; }
+            if (r < o.warmup) continue;
+            total.push_back(rep.buildMs);
+            upload.push_back(rep.uploadMs);
+            download.push_back(rep.downloadMs);
+            for (auto& st : rep.stages)
+                for (int s = 0; s < 6; ++s)
+                    if (st.first == stageNames[s]) stage[s].push_back(st.second);
+        }
+        if (!ok) { ++failures; continue; }
+        if (o.validate) {
+            std::string rep;
+            bool valid = validate_bvh(bvh, rep);
+            if (!valid) { std::printf("%-10s INVALID TREE\n%s", b.c_str(), rep.c_str()); ++failures; }
+        }
+        TreeStats ts = tree_stats(bvh);
+        std::printf("%-10s %10.2f %10.2f %10.2f %8d %8zu\n", b.c_str(), median(total), median(upload), ts.sahCost,
+                    ts.maxDepth, ts.leaves);
+        csv << o.tag << "," << label << "," << mesh.faces.size() << "," << b << "," << o.bp.maxLeaf << ","
+            << total.size() << "," << median(total) << "," << median(upload) << "," << median(download);
+        for (int s = 0; s < 6; ++s) {
+            csv << ",";
+            if (!stage[s].empty()) csv << median(stage[s]);
+        }
+        csv << "," << ts.sahCost << "," << ts.nodes << "," << ts.leaves << "," << ts.maxDepth << ","
+            << ts.avgLeafSize << "\n";
     }
     return failures ? 1 : 0;
 }
@@ -324,6 +454,65 @@ bool verify_scene(const Options& o, const std::string& path, const std::string& 
                     std::isinf(c.psnr) ? "inf" : std::to_string(c.psnr).substr(0, 6).c_str(), pass ? "PASS" : "FAIL");
         if (gm == GpuMode::BvhOpt) write_png("renders/verify_" + name + "_gpu.png", rp.width, rp.height, pix);
     }
+
+    // Other builders: valid trees, GPU LBVH == CPU LBVH, and render invariance against the
+    // CPU-SAH reference (the closest hit does not depend on the tree, apart from exact ties).
+    std::printf("  builders vs the cpu_sah reference:\n");
+    BVH cpuLbvh;
+    for (BuilderKind bk : {BuilderKind::CpuLbvh, BuilderKind::GpuLbvh}) {
+        const char* bn = builder_name(bk);
+        BVH other;
+        BuildReport br;
+        std::string err;
+        if (!build_with(bk, mesh, o.bp, other, br, err)) {
+            std::printf("  %-20s FAIL: %s\n", bn, err.c_str());
+            ok = false;
+            continue;
+        }
+        std::string vrep;
+        bool valid = validate_bvh(other, vrep);
+        TreeStats ts = tree_stats(other), ref = tree_stats(bvh);
+        std::printf("  %-20s built in %.1f ms, depth %d, SAH cost %.2f (%.0f%% of cpu_sah), structure %s\n", bn,
+                    br.buildMs, ts.maxDepth, ts.sahCost, 100.0 * ts.sahCost / ref.sahCost, valid ? "valid" : "INVALID");
+        if (!valid) std::printf("%s", vrep.c_str());
+        ok = ok && valid;
+        if (bk == BuilderKind::CpuLbvh) cpuLbvh = other;
+        if (bk == BuilderKind::GpuLbvh) {
+            std::string why;
+            bool same = same_bvh(cpuLbvh, other, why);
+            std::printf("  %-20s node-for-node identical to cpu_lbvh: %s %s\n", bn, same ? "PASS" : "FAIL", why.c_str());
+            ok = ok && same;
+        }
+        std::vector<uint32_t> pix;
+        std::vector<int> ids;
+        GpuTimings tm;
+        if (!render_gpu(other, mesh, GpuMode::BvhOpt, sp, o.launch, pix, &ids, tm, err)) {
+            std::printf("  %-20s render FAIL: %s\n", bn, err.c_str());
+            ok = false;
+            continue;
+        }
+        Comparison c = compare_renders(cpuPix, cpuIds, pix, ids);
+        double rate = double(c.idMismatches) / double(c.pixels);
+        bool pass = rate <= 1e-4 && c.psnr >= 40.0;
+        ok = ok && pass;
+        std::printf("  %-20s gpu_bvh_opt hit-ID mismatches %zu/%zu (%.4f%%), PSNR %s dB -> %s\n", bn, c.idMismatches,
+                    c.pixels, 100.0 * rate, std::isinf(c.psnr) ? "inf" : std::to_string(c.psnr).substr(0, 6).c_str(),
+                    pass ? "PASS" : "FAIL");
+        if (bk == BuilderKind::GpuLbvh) {
+            // Same tree rendered straight from device memory, without the host round trip.
+            DeviceBvh dev;
+            BuildReport br2;
+            std::vector<uint32_t> pix2;
+            std::vector<int> ids2;
+            bool rok = build_lbvh_gpu(mesh, o.bp, nullptr, &dev, &br2, err) &&
+                       render_gpu_resident(dev, GpuMode::BvhOpt, sp, o.launch, pix2, &ids2, tm, err);
+            dev.release();
+            bool same = rok && pix2 == pix && ids2 == ids;
+            std::printf("  %-20s device-resident render identical: %s %s\n", bn, same ? "PASS" : "FAIL",
+                        rok ? "" : err.c_str());
+            ok = ok && same;
+        }
+    }
     return ok;
 }
 
@@ -349,5 +538,6 @@ int run_verify(const Options& o) {
 int main(int argc, char** argv) {
     Options o;
     if (!parse_args(argc, argv, o)) return 2;
-    return o.verify ? run_verify(o) : run_benchmark(o);
+    if (o.verify) return run_verify(o);
+    return o.buildBench ? run_build_bench(o) : run_benchmark(o);
 }
