@@ -32,7 +32,10 @@ add_library(rt_core STATIC
   src/ply_loader.cpp
   src/bvh_build.cpp
   src/bvh_build_lbvh_cpu.cpp
+  src/gpu_build_common.cu
   src/bvh_build_lbvh_gpu.cu
+  src/bvh_build_ploc_cpu.cpp
+  src/bvh_build_ploc_gpu.cu
   src/bvh_convert_cpu.cpp
   src/builders.cpp
   src/animate.cu

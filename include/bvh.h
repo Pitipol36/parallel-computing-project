@@ -33,6 +33,11 @@ constexpr int BVH_MAX_DEPTH = BVH_STACK_SIZE - 2;
 struct BuildParams {
     int bins = 16;     // SAH bins per axis (16..32)
     int maxLeaf = 4;   // a node with this many triangles or fewer may become a leaf
+    int plocRadius = 8;  // PLOC nearest-neighbour search: r clusters on each side
+    bool sahCollapse = true;
+    int trbvhPasses = 3;   // TRBVH restructuring passes (gamma doubles each pass)
+    int trbvhTreelet = 7;  // TRBVH treelet leaves (2..7)
+    bool trbvhWarp = true;  // GPU TRBVH: one warp per treelet (false: one thread per treelet)  // binary-tree builders: collapse a subtree into a leaf only when SAH says so
 };
 
 struct BVH {

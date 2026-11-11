@@ -71,14 +71,21 @@ void usage() {
         "  --out FILE.png      write the image (one file per mode: FILE_<mode>.png)\n"
         "  --csv FILE          append timing rows to a CSV file\n"
         "  --bins N --leaf N   SAH bins per axis (16) and max leaf size (4)\n"
-        "  --build LIST        BVH builder: cpu_sah (default), cpu_lbvh, gpu_lbvh; a comma list\n"
-        "                      with --build-bench\n"
+        "  --build LIST        BVH builder: cpu_sah (default), cpu_lbvh, gpu_lbvh, cpu_ploc,\n"
+        "                      gpu_ploc, cpu_trbvh, gpu_trbvh; a comma list with --build-bench\n"
+        "  --ploc-radius R     PLOC nearest-neighbour search radius (default 8)\n"
+        "  --trbvh-passes P    TRBVH restructuring passes (default 3; gamma doubles each pass)\n"
+        "  --trbvh-treelet N   TRBVH treelet leaves, 2..7 (default 7)\n"
+        "  --trbvh-thread      GPU TRBVH: one thread per treelet instead of one warp\n"
+        "  --collapse sah|count  leaf collapse of the LBVH/PLOC trees: by SAH cost (default) or\n"
+        "                      any subtree with at most --leaf triangles\n"
         "  --build-bench       time each --build builder (--warmup/--runs, median per stage),\n"
         "                      print tree quality, append to --build-csv; no rendering\n"
         "  --build-csv FILE    CSV for --build-bench rows (default results/build.csv)\n"
         "  --stats-csv FILE    append traversal counters per mode (RT_TRAVERSAL_STATS builds only)\n"
         "  --dynamic           exploding-mesh animation; per frame compares a cpu_sah rebuild, a\n"
-        "                      gpu_lbvh rebuild and a refit of the frame-0 gpu_lbvh tree\n"
+        "                      gpu_lbvh rebuild, a refit of the frame-0 gpu_lbvh tree and a\n"
+        "                      gpu_ploc rebuild\n"
         "  --frames N          frames for --dynamic (default 60)\n"
         "  --dynamic-csv FILE  per-frame rows for --dynamic (default results/dynamic.csv); with\n"
         "                      --out, every frame of the gpu_lbvh render is written as PNG\n"
@@ -129,6 +136,11 @@ bool parse_args(int argc, char** argv, Options& o) {
         else if (a == "--csv") o.csv = next();
         else if (a == "--bins") o.bp.bins = std::stoi(next());
         else if (a == "--leaf") o.bp.maxLeaf = std::stoi(next());
+        else if (a == "--ploc-radius") o.bp.plocRadius = std::stoi(next());
+        else if (a == "--collapse") o.bp.sahCollapse = next() != "count";
+        else if (a == "--trbvh-passes") o.bp.trbvhPasses = std::max(0, std::stoi(next()));
+        else if (a == "--trbvh-treelet") o.bp.trbvhTreelet = std::min(7, std::max(2, std::stoi(next())));
+        else if (a == "--trbvh-thread") o.bp.trbvhWarp = false;
         else if (a == "--yaw") o.rp.yawDeg = std::stof(next());
         else if (a == "--pitch") o.rp.pitchDeg = std::stof(next());
         else if (a == "--fov") o.rp.fovDeg = std::stof(next());
@@ -361,20 +373,23 @@ int run_build_bench(const Options& o) {
     bool exists = fs::exists(csvPath);
     if (fs::path(csvPath).has_parent_path()) fs::create_directories(fs::path(csvPath).parent_path());
     std::ofstream csv(csvPath, std::ios::app);
-    const char* stageNames[] = {"bounds", "morton", "sort", "hierarchy", "fit", "convert"};
+    const char* stageNames[] = {"bounds", "morton", "sort", "hierarchy", "fit", "cluster", "restructure", "convert"};
+    constexpr int NS = 8;
     if (!exists) {
         csv << "experiment,model,tris,builder,leaf,runs,build_ms,upload_ms,download_ms";
         for (const char* s : stageNames) csv << "," << s << "_ms";
-        csv << ",sah_cost,nodes,leaves,max_depth,avg_leaf\n";
+        csv << ",sah_cost,nodes,leaves,max_depth,avg_leaf,ploc_radius,iterations,trbvh_passes\n";
     }
-    std::printf("%-10s %10s %10s %10s %8s %8s\n", "builder", "build ms", "upload ms", "SAH cost", "depth", "leaves");
+    std::printf("%-10s %10s %10s %10s %8s %8s %6s\n", "builder", "build ms", "upload ms", "SAH cost", "depth", "leaves",
+                "iters");
     int failures = 0;
     for (const std::string& b : o.builders) {
         BuilderKind bk = builder_of(b);
         std::vector<double> total, upload, download;
-        std::vector<std::vector<double>> stage(6);
+        std::vector<std::vector<double>> stage(NS);
         BVH bvh;
         bool ok = true;
+        int iterations = 0;
         for (int r = 0; r < o.warmup + o.runs && ok; ++r) {
             BuildReport rep;
             std::string err;
@@ -384,8 +399,9 @@ int run_build_bench(const Options& o) {
             total.push_back(rep.buildMs);
             upload.push_back(rep.uploadMs);
             download.push_back(rep.downloadMs);
+            iterations = rep.iterations;
             for (auto& st : rep.stages)
-                for (int s = 0; s < 6; ++s)
+                for (int s = 0; s < NS; ++s)
                     if (st.first == stageNames[s]) stage[s].push_back(st.second);
         }
         if (!ok) { ++failures; continue; }
@@ -395,16 +411,20 @@ int run_build_bench(const Options& o) {
             if (!valid) { std::printf("%-10s INVALID TREE\n%s", b.c_str(), rep.c_str()); ++failures; }
         }
         TreeStats ts = tree_stats(bvh);
-        std::printf("%-10s %10.2f %10.2f %10.2f %8d %8zu\n", b.c_str(), median(total), median(upload), ts.sahCost,
-                    ts.maxDepth, ts.leaves);
+        std::printf("%-10s %10.2f %10.2f %10.2f %8d %8zu %6d\n", b.c_str(), median(total), median(upload), ts.sahCost,
+                    ts.maxDepth, ts.leaves, iterations);
         csv << o.tag << "," << label << "," << mesh.faces.size() << "," << b << "," << o.bp.maxLeaf << ","
             << total.size() << "," << median(total) << "," << median(upload) << "," << median(download);
-        for (int s = 0; s < 6; ++s) {
+        for (int s = 0; s < NS; ++s) {
             csv << ",";
             if (!stage[s].empty()) csv << median(stage[s]);
         }
+        const bool ploc = bk == BuilderKind::CpuPloc || bk == BuilderKind::GpuPloc;
+        const bool trbvh = bk == BuilderKind::CpuTrbvh || bk == BuilderKind::GpuTrbvh;
         csv << "," << ts.sahCost << "," << ts.nodes << "," << ts.leaves << "," << ts.maxDepth << ","
-            << ts.avgLeafSize << "\n";
+            << ts.avgLeafSize << "," << (ploc ? std::to_string(o.bp.plocRadius) : "") << ","
+            << (ploc ? std::to_string(iterations) : "") << ","
+            << (trbvh ? std::to_string(o.bp.trbvhPasses) : "") << "\n";
     }
     return failures ? 1 : 0;
 }
@@ -445,14 +465,19 @@ int run_dynamic(const Options& o) {
 
     std::printf("Dynamic scene: %s exploding, %d triangles, %d frames, %dx%d, %d AO\n", label.c_str(), n, o.frames,
                 rp.width, rp.height, rp.aoSamples);
-    std::printf("%5s %6s | %-28s | %-28s | %-28s\n", "frame", "t", "cpu_sah rebuild (upd+render)",
-                "gpu_lbvh rebuild", "gpu refit");
+    constexpr int NV = 4;
+    std::printf("%5s %6s | %-28s | %-28s | %-28s | %-28s\n", "frame", "t", "cpu_sah rebuild (upd+render)",
+                "gpu_lbvh rebuild", "gpu refit", "gpu_ploc rebuild");
     GpuLbvhBuilder rebuilder, refitter;
-    if (!rebuilder.reserve(n, err) || !refitter.reserve(n, err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
+    GpuPlocBuilder ploc;
+    if (!rebuilder.reserve(n, err) || !refitter.reserve(n, err) || !ploc.reserve(n, err)) {
+        std::fprintf(stderr, "%s\n", err.c_str());
+        return 1;
+    }
     std::vector<vec3> verts;
     struct Sum { double total = 0; double sah = 0; };
-    Sum sums[3];
-    const char* names[3] = {"cpu_sah_rebuild", "gpu_lbvh_rebuild", "gpu_refit"};
+    Sum sums[NV];
+    const char* names[NV] = {"cpu_sah_rebuild", "gpu_lbvh_rebuild", "gpu_refit", "gpu_ploc_rebuild"};
     // Warm-up of every path at t = 0 (first CUDA calls, CUB, allocations), not recorded.
     {
         BuildReport r;
@@ -460,10 +485,11 @@ int run_dynamic(const Options& o) {
         std::vector<uint32_t> px;
         rebuilder.build(dVerts, dFaces, n, o.bp, &r, err);
         render_gpu_resident(rebuilder.tree(), GpuMode::BvhOpt, sp, o.launch, px, nullptr, tm, err);
+        ploc.build(dVerts, dFaces, n, o.bp, &r, err);
     }
     for (int f = 0; f < o.frames; ++f) {
         const float t = float(f) / float(o.frames - 1);
-        double totals[3], upd[3], ren[3], sah[3], anim[3];
+        double totals[NV], upd[NV], ren[NV], sah[NV], anim[NV];
         std::vector<uint32_t> pixels;
 
         // GPU variants share one animation step.
@@ -508,6 +534,19 @@ int run_dynamic(const Options& o) {
             refitter.download(host, err);
             upd[2] = ms; ren[2] = tm.e2eMs; sah[2] = tree_stats(host).sahCost; anim[2] = animMs;
         }
+        // gpu_ploc: rebuild with PLOC on the device, render the resident tree.
+        {
+            BuildReport r;
+            GpuTimings tm;
+            BVH host;
+            if (!ploc.build(dVerts, dFaces, n, o.bp, &r, err) ||
+                !render_gpu_resident(ploc.tree(), GpuMode::BvhOpt, sp, o.launch, pixels, nullptr, tm, err)) {
+                std::fprintf(stderr, "gpu_ploc frame %d: %s\n", f, err.c_str());
+                return 1;
+            }
+            ploc.download(host, err);
+            upd[3] = r.buildMs; ren[3] = tm.e2eMs; sah[3] = tree_stats(host).sahCost; anim[3] = animMs;
+        }
         // cpu_sah: animate and rebuild on the CPU, upload the tree, render.
         {
             auto ta = Clock::now();
@@ -522,8 +561,8 @@ int run_dynamic(const Options& o) {
             }
             upd[0] = bvh.buildMs; ren[0] = tm.e2eMs; sah[0] = tree_stats(bvh).sahCost;
         }
-        char cell[3][64];
-        for (int v = 0; v < 3; ++v) {
+        char cell[NV][64];
+        for (int v = 0; v < NV; ++v) {
             totals[v] = upd[v] + ren[v];
             sums[v].total += totals[v];
             sums[v].sah += sah[v];
@@ -532,10 +571,10 @@ int run_dynamic(const Options& o) {
                 << t << "," << names[v] << "," << anim[v] << "," << upd[v] << "," << ren[v] << "," << totals[v] << ","
                 << sah[v] << "\n";
         }
-        std::printf("%5d %6.3f | %-28s | %-28s | %-28s\n", f, t, cell[0], cell[1], cell[2]);
+        std::printf("%5d %6.3f | %-28s | %-28s | %-28s | %-28s\n", f, t, cell[0], cell[1], cell[2], cell[3]);
     }
     std::printf("\nmean per frame (update + render, animation excluded):\n");
-    for (int v = 0; v < 3; ++v)
+    for (int v = 0; v < NV; ++v)
         std::printf("  %-18s %8.1f ms  (%5.1f fps), mean SAH cost %.1f\n", names[v], sums[v].total / o.frames,
                     1000.0 * o.frames / sums[v].total, sums[v].sah / o.frames);
     return 0;
@@ -602,8 +641,9 @@ bool verify_scene(const Options& o, const std::string& path, const std::string& 
     // Other builders: valid trees, GPU LBVH == CPU LBVH, and render invariance against the
     // CPU-SAH reference (the closest hit does not depend on the tree, apart from exact ties).
     std::printf("  builders vs the cpu_sah reference:\n");
-    BVH cpuLbvh;
-    for (BuilderKind bk : {BuilderKind::CpuLbvh, BuilderKind::GpuLbvh}) {
+    BVH cpuLbvh, cpuPloc, cpuTrbvh;
+    for (BuilderKind bk : {BuilderKind::CpuLbvh, BuilderKind::GpuLbvh, BuilderKind::CpuPloc, BuilderKind::GpuPloc,
+                           BuilderKind::CpuTrbvh, BuilderKind::GpuTrbvh}) {
         const char* bn = builder_name(bk);
         BVH other;
         BuildReport br;
@@ -621,10 +661,14 @@ bool verify_scene(const Options& o, const std::string& path, const std::string& 
         if (!valid) std::printf("%s", vrep.c_str());
         ok = ok && valid;
         if (bk == BuilderKind::CpuLbvh) cpuLbvh = other;
-        if (bk == BuilderKind::GpuLbvh) {
+        if (bk == BuilderKind::CpuPloc) cpuPloc = other;
+        if (bk == BuilderKind::CpuTrbvh) cpuTrbvh = other;
+        if (bk == BuilderKind::GpuLbvh || bk == BuilderKind::GpuPloc || bk == BuilderKind::GpuTrbvh) {
+            const BVH& ref = bk == BuilderKind::GpuLbvh ? cpuLbvh : (bk == BuilderKind::GpuPloc ? cpuPloc : cpuTrbvh);
+            const char* rn = bk == BuilderKind::GpuLbvh ? "cpu_lbvh" : (bk == BuilderKind::GpuPloc ? "cpu_ploc" : "cpu_trbvh");
             std::string why;
-            bool same = same_bvh(cpuLbvh, other, why);
-            std::printf("  %-20s node-for-node identical to cpu_lbvh: %s %s\n", bn, same ? "PASS" : "FAIL", why.c_str());
+            bool same = same_bvh(ref, other, why);
+            std::printf("  %-20s node-for-node identical to %s: %s %s\n", bn, rn, same ? "PASS" : "FAIL", why.c_str());
             ok = ok && same;
         }
         std::vector<uint32_t> pix;

@@ -8,6 +8,7 @@
 
 #include "builders.h"
 #include "morton.h"
+#include "ploc.h"
 #include "ply_loader.h"
 #include "render.h"
 #include "trace.h"
@@ -328,6 +329,108 @@ void test_lbvh_builders() {
     }
 }
 
+void test_ploc_builders() {
+    std::string gdesc, err;
+    size_t fb, tb;
+    const bool gpu = gpu_info(gdesc, fb, tb);
+    // Tie-break: a strict total order on pairs, so the smallest pair is always mutual.
+    check(ploc_better(1.0f, 5, 6, 2.0f, 4), "smaller distance wins");
+    check(ploc_better(1.0f, 5, 4, 1.0f, 6), "equal distance: pair with the smaller low index wins");
+    check(!ploc_better(1.0f, 5, 6, 1.0f, 4), "equal distance: (4,5) beats (5,6)");
+    check(ploc_merged_area({0, 0, 0}, {1, 1, 1}, {1, 0, 0}, {2, 1, 1}) == 10.0f, "merged area of two unit cubes");
+    struct Case { const char* name; Mesh mesh; int leaf, radius; };
+    std::vector<Case> cases;
+    cases.push_back({"icosphere(4)", make_icosphere(4), 4, 8});
+    cases.push_back({"test scene", make_test_scene(3), 2, 1});
+    cases.push_back({"icosphere(5), r=32", make_icosphere(5), 4, 32});
+    Mesh one;
+    one.vertices = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+    one.faces = {{0, 1, 2}};
+    cases.push_back({"single triangle", one, 4, 8});
+    Mesh dup = make_icosphere(2);  // every triangle twice: zero-area merges and exact ties
+    size_t nf = dup.faces.size();
+    for (size_t i = 0; i < nf; ++i) dup.faces.push_back(dup.faces[i]);
+    cases.push_back({"duplicated icosphere(2)", dup, 4, 4});
+    for (Case& c : cases) {
+        BuildParams bp;
+        bp.maxLeaf = c.leaf;
+        bp.plocRadius = c.radius;
+        std::printf("  PLOC on %s (%zu tris, leaf=%d, r=%d)\n", c.name, c.mesh.faces.size(), c.leaf, c.radius);
+        BuildReport crep;
+        BVH cpu = build_ploc_cpu(c.mesh, bp, &crep);
+        if (c.mesh.faces.size() > 1) check_bvh(c.mesh, cpu);
+        else {
+            std::string rep;
+            check(validate_bvh(cpu, rep), "single-triangle PLOC is valid");
+        }
+        if (c.mesh.faces.size() > 100) {
+            BVH lb = build_lbvh_cpu(c.mesh, bp, nullptr);
+            double sp = tree_stats(cpu).sahCost, sl = tree_stats(lb).sahCost;
+            std::printf("    %d iterations, SAH cost %.2f (LBVH %.2f)\n", crep.iterations, sp, sl);
+            check(sp <= sl, "PLOC tree is at least as good as LBVH by SAH cost");
+        }
+        if (!gpu) continue;
+        BVH g;
+        BuildReport rep;
+        bool built = build_ploc_gpu(c.mesh, bp, &g, nullptr, &rep, err);
+        if (!built) std::printf("    %s\n", err.c_str());
+        check(built, "GPU PLOC builds");
+        std::string why;
+        bool same = built && same_bvh(cpu, g, why);
+        if (built && !same) std::printf("    %s\n", why.c_str());
+        check(same, "GPU PLOC is node-for-node identical to the CPU PLOC");
+        check(!built || rep.iterations == crep.iterations, "GPU and CPU take the same number of iterations");
+    }
+}
+
+void test_trbvh_builders() {
+    std::string gdesc, err;
+    size_t fb, tb;
+    const bool gpu = gpu_info(gdesc, fb, tb);
+    struct Case { const char* name; Mesh mesh; int leaf, treelet, passes; };
+    std::vector<Case> cases;
+    cases.push_back({"icosphere(4)", make_icosphere(4), 4, 7, 3});
+    cases.push_back({"test scene, treelet 5", make_test_scene(3), 2, 5, 2});
+    cases.push_back({"icosphere(5), 1 pass", make_icosphere(5), 4, 7, 1});
+    Mesh tiny;  // 3 triangles: treelets smaller than the requested size
+    tiny.vertices = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {5, 0, 0}, {6, 0, 0}, {5, 1, 0}, {0, 0, 5}, {1, 0, 5}, {0, 1, 5}};
+    tiny.faces = {{0, 1, 2}, {3, 4, 5}, {6, 7, 8}};
+    cases.push_back({"three triangles", tiny, 1, 7, 3});
+    Mesh dup = make_icosphere(2);
+    size_t nf = dup.faces.size();
+    for (size_t i = 0; i < nf; ++i) dup.faces.push_back(dup.faces[i]);
+    cases.push_back({"duplicated icosphere(2)", dup, 4, 7, 3});
+    for (Case& c : cases) {
+        BuildParams bp;
+        bp.maxLeaf = c.leaf;
+        bp.trbvhTreelet = c.treelet;
+        bp.trbvhPasses = c.passes;
+        std::printf("  TRBVH on %s (%zu tris, leaf=%d, treelet=%d, passes=%d)\n", c.name, c.mesh.faces.size(), c.leaf,
+                    c.treelet, c.passes);
+        BVH cpu = build_lbvh_cpu(c.mesh, bp, nullptr, true);
+        if (c.mesh.faces.size() > 10) {
+            check_bvh(c.mesh, cpu);
+        } else {
+            std::string rep;
+            check(validate_bvh(cpu, rep), "small TRBVH is valid");
+        }
+        BVH lb = build_lbvh_cpu(c.mesh, bp, nullptr, false);
+        double st = tree_stats(cpu).sahCost, sl = tree_stats(lb).sahCost;
+        std::printf("    SAH cost %.2f (LBVH %.2f)\n", st, sl);
+        check(st <= sl * 1.0001, "restructuring never makes the tree worse by SAH cost");
+        if (!gpu) continue;
+        BVH g;
+        BuildReport rep;
+        bool built = build_lbvh_gpu(c.mesh, bp, &g, nullptr, &rep, err, true);
+        if (!built) std::printf("    %s\n", err.c_str());
+        check(built, "GPU TRBVH builds");
+        std::string why;
+        bool same = built && same_bvh(cpu, g, why);
+        if (built && !same) std::printf("    %s\n", why.c_str());
+        check(same, "GPU TRBVH is node-for-node identical to the CPU TRBVH");
+    }
+}
+
 }  // namespace
 
 int run_unit_tests() {
@@ -345,6 +448,8 @@ int run_unit_tests() {
     test_lbvh_delta();
     test_lbvh_hierarchy();
     test_lbvh_builders();
+    test_ploc_builders();
+    test_trbvh_builders();
     std::printf("Unit tests: %d/%d checks passed -> %s\n", g_checks - g_failures, g_checks,
                 g_failures ? "FAIL" : "PASS");
     return g_failures;

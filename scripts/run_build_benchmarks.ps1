@@ -20,7 +20,7 @@ foreach ($f in $buildCsv, $renderCsv, $travCsv, $dynCsv) { if (Test-Path $f) { R
 
 $runs = if ($Quick) { 1 } else { 5 }
 $slowCpu = if ($Quick) { 1 } else { 3 }
-$builders = "cpu_sah,cpu_lbvh,gpu_lbvh"
+$builders = "cpu_sah,cpu_lbvh,gpu_lbvh,cpu_ploc,gpu_ploc"
 $models = @(
     @{ label = "bunny";  file = "data\bun_zipper.ply"; up = "y" },
     @{ label = "dragon"; file = "data\dragon_vrip.ply"; up = "y" },
@@ -44,9 +44,15 @@ foreach ($m in $present) {
                   "--tag", "size", "--build-csv", $buildCsv)
 }
 
-# 3. Quality trade-off: render the SAH and LBVH trees (cpu_lbvh's tree is identical to gpu_lbvh's).
+# PLOC radius sweep (dragon): build time and SAH cost against the search radius r.
+foreach ($r in 1, 2, 4, 8, 16, 32, 64) {
+    Run $exe $dragon @("--build-bench", "--build", "gpu_ploc", "--ploc-radius", "$r", "--runs", $runs, "--warmup", "1",
+                       "--tag", "radius", "--build-csv", $buildCsv)
+}
+
+# 3. Quality trade-off: render each builder's tree (the cpu_* LBVH/PLOC trees equal the gpu_* ones).
 foreach ($m in $present) {
-    foreach ($b in "cpu_sah", "gpu_lbvh") {
+    foreach ($b in "cpu_sah", "gpu_lbvh", "gpu_ploc") {
         Run $exe $m @("--build", $b, "--width", "1920", "--height", "1080", "--ao", "4",
                       "--mode", "cpu,gpu_bvh_opt,gpu_bvh_persistent", "--runs", $runs, "--cpu-runs", $slowCpu,
                       "--tag", "quality_$b", "--csv", $renderCsv)
@@ -61,13 +67,13 @@ foreach ($m in $present) {
 # 5. Rays per build: render time vs AO samples on each tree (dragon, 1080p). Combined with
 #    the build times this gives total time-to-image and the SAH/LBVH crossover.
 foreach ($ao in 0, 1, 4, 16, 64) {
-    foreach ($b in "cpu_sah", "gpu_lbvh") {
+    foreach ($b in "cpu_sah", "gpu_lbvh", "gpu_ploc") {
         Run $exe $dragon @("--build", $b, "--width", "1920", "--height", "1080", "--ao", "$ao",
                            "--mode", "gpu_bvh_opt", "--runs", $runs, "--tag", "rays_$b", "--csv", $renderCsv)
     }
 }
 
-# 4. Dynamic scene: exploding dragon, rebuild vs refit every frame.
+# 4. Dynamic scene: exploding dragon, rebuilds (CPU SAH, GPU LBVH, GPU PLOC) vs refit every frame.
 $frames = if ($Quick) { 10 } else { 60 }
 Run $exe $dragon @("--dynamic", "--frames", "$frames", "--width", "1280", "--height", "720", "--ao", "4",
                    "--dynamic-csv", $dynCsv, "--out", "renders\explode.png")

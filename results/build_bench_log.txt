@@ -1,332 +1,493 @@
 WARNING: data\lucy.ply missing, skipped
 
->>> bunny --build-bench --build cpu_sah,cpu_lbvh,gpu_lbvh --runs 5 --warmup 1 --validate --tag size --build-csv results\build.csv
-Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (29 ms)
-builder      build ms  upload ms   SAH cost    depth   leaves
-cpu_sah         56.68       0.00      36.83       18    37444
-cpu_lbvh        19.55       0.00      44.49       22    23153
-gpu_lbvh         0.47       1.50      44.49       22    23153
+>>> bunny --build-bench --build cpu_sah,cpu_lbvh,gpu_lbvh,cpu_ploc,gpu_ploc --runs 5 --warmup 1 --validate --tag size --build-csv results\build.csv
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (31 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+cpu_sah         57.32       0.00      36.83       18    37444      0
+cpu_lbvh        22.39       0.00      43.37       22    38183      0
+gpu_lbvh         0.51       1.45      43.37       22    38183      0
+cpu_ploc        43.88       0.00      41.00       22    35835     42
+gpu_ploc         3.53       1.82      41.00       22    35835     42
 
->>> dragon --build-bench --build cpu_sah,cpu_lbvh,gpu_lbvh --runs 5 --warmup 1 --validate --tag size --build-csv results\build.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (281 ms)
-builder      build ms  upload ms   SAH cost    depth   leaves
-cpu_sah        771.16       0.00      57.50       26   479501
-cpu_lbvh       264.65       0.00      71.06       34   319895
-gpu_lbvh         4.62      10.67      71.06       34   319895
+>>> dragon --build-bench --build cpu_sah,cpu_lbvh,gpu_lbvh,cpu_ploc,gpu_ploc --runs 5 --warmup 1 --validate --tag size --build-csv results\build.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (493 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+cpu_sah        800.07       0.00      57.50       26   479501      0
+cpu_lbvh       334.83       0.00      70.02       35   459666      0
+gpu_lbvh         4.78      11.03      70.02       35   459666      0
+cpu_ploc       734.98       0.00      63.57       33   455287     67
+gpu_ploc        13.38      13.17      63.57       33   455287     67
 
->>> buddha --build-bench --build cpu_sah,cpu_lbvh,gpu_lbvh --runs 5 --warmup 1 --validate --tag size --build-csv results\build.csv
-Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (628 ms)
-builder      build ms  upload ms   SAH cost    depth   leaves
-cpu_sah        941.15       0.00      65.25       26   595131
-cpu_lbvh       336.79       0.00      85.05       35   402814
-gpu_lbvh         5.64      13.25      85.05       35   402814
+>>> buddha --build-bench --build cpu_sah,cpu_lbvh,gpu_lbvh,cpu_ploc,gpu_ploc --runs 5 --warmup 1 --validate --tag size --build-csv results\build.csv
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (600 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+cpu_sah        966.94       0.00      65.25       26   595131      0
+cpu_lbvh       426.23       0.00      83.73       35   585260      0
+gpu_lbvh         5.96      13.71      83.73       35   585260      0
+cpu_ploc       965.99       0.00      71.96       35   569410     64
+gpu_ploc        13.67      14.60      71.96       35   569410     64
+
+>>> dragon --build-bench --build gpu_ploc --ploc-radius 1 --runs 5 --warmup 1 --tag radius --build-csv results\build.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (321 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+gpu_ploc         8.10      10.63      67.39       34   467377     39
+
+>>> dragon --build-bench --build gpu_ploc --ploc-radius 2 --runs 5 --warmup 1 --tag radius --build-csv results\build.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (310 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+gpu_ploc         9.53      10.39      64.32       34   461186     51
+
+>>> dragon --build-bench --build gpu_ploc --ploc-radius 4 --runs 5 --warmup 1 --tag radius --build-csv results\build.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (316 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+gpu_ploc        10.25      10.65      63.72       34   458303     58
+
+>>> dragon --build-bench --build gpu_ploc --ploc-radius 8 --runs 5 --warmup 1 --tag radius --build-csv results\build.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (312 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+gpu_ploc        11.63      10.29      63.57       33   455287     67
+
+>>> dragon --build-bench --build gpu_ploc --ploc-radius 16 --runs 5 --warmup 1 --tag radius --build-csv results\build.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (309 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+gpu_ploc        12.91      10.79      63.35       32   453140     68
+
+>>> dragon --build-bench --build gpu_ploc --ploc-radius 32 --runs 5 --warmup 1 --tag radius --build-csv results\build.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (312 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+gpu_ploc        14.32      10.39      63.79       33   451463     68
+
+>>> dragon --build-bench --build gpu_ploc --ploc-radius 64 --runs 5 --warmup 1 --tag radius --build-csv results\build.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (313 ms)
+builder      build ms  upload ms   SAH cost    depth   leaves  iters
+gpu_ploc        17.90      10.59      64.45       33   450358     74
 
 >>> bunny --build cpu_sah --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_cpu_sah --csv results\build_render.csv
-Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (30 ms)
-BVH (cpu_sah): 74887 nodes, 37444 leaves (avg 1.85 tris), depth 18, SAH cost 36.83, built in 56.21 ms
-  stages (ms): sah 56.21
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (33 ms)
+BVH (cpu_sah): 74887 nodes, 37444 leaves (avg 1.85 tris), depth 18, SAH cost 36.83, built in 62.68 ms
+  stages (ms): sah 62.68
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-cpu                        727.75       727.75         17.1           
-gpu_bvh_opt                  4.59         8.78       2711.3     158.6x
-gpu_bvh_persistent           4.73         9.28       2629.1     153.8x
+cpu                        786.53       786.53         15.8           
+gpu_bvh_opt                  4.39         8.58       2834.2     179.2x
+gpu_bvh_persistent           4.49         8.10       2772.2     175.3x
 
 >>> bunny --build cpu_sah --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
-Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (30 ms)
-BVH (cpu_sah): 74887 nodes, 37444 leaves (avg 1.85 tris), depth 18, SAH cost 36.83, built in 61.30 ms
-  stages (ms): sah 61.30
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (32 ms)
+BVH (cpu_sah): 74887 nodes, 37444 leaves (avg 1.85 tris), depth 18, SAH cost 36.83, built in 59.05 ms
+  stages (ms): sah 59.05
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  5.48        30.78       2271.9           
+gpu_bvh_opt                  5.07        12.69       2452.6           
   traversal: 3553236 rays traced, 24.51 box tests and 1.85 triangle tests per ray
 
 >>> bunny --build gpu_lbvh --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_gpu_lbvh --csv results\build_render.csv
-Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (30 ms)
-BVH (gpu_lbvh): 46305 nodes, 23153 leaves (avg 3.00 tris), depth 22, SAH cost 44.49, built in 0.57 ms
-  stages (ms): bounds 0.06, morton 0.01, sort 0.20, hierarchy 0.05, fit 0.11, convert 0.14; mesh upload 100.26, tree download 1.77
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (32 ms)
+BVH (gpu_lbvh): 76365 nodes, 38183 leaves (avg 1.82 tris), depth 22, SAH cost 43.37, built in 0.98 ms
+  stages (ms): bounds 0.12, morton 0.01, sort 0.43, hierarchy 0.12, fit 0.13, convert 0.16; mesh upload 112.73, tree download 2.50
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-cpu                        810.31       810.31         15.4           
-gpu_bvh_opt                  5.79         9.51       2148.7     139.9x
-gpu_bvh_persistent           5.83         9.51       2132.6     138.9x
+cpu                        825.71       825.71         15.1           
+gpu_bvh_opt                  5.10         8.74       2439.5     161.9x
+gpu_bvh_persistent           5.15         9.42       2417.6     160.4x
 
 >>> bunny --build gpu_lbvh --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
-Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (30 ms)
-BVH (gpu_lbvh): 46305 nodes, 23153 leaves (avg 3.00 tris), depth 22, SAH cost 44.49, built in 0.52 ms
-  stages (ms): bounds 0.06, morton 0.01, sort 0.18, hierarchy 0.04, fit 0.10, convert 0.13; mesh upload 104.38, tree download 1.71
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (32 ms)
+BVH (gpu_lbvh): 76365 nodes, 38183 leaves (avg 1.82 tris), depth 22, SAH cost 43.37, built in 0.89 ms
+  stages (ms): bounds 0.07, morton 0.01, sort 0.42, hierarchy 0.11, fit 0.13, convert 0.16; mesh upload 123.88, tree download 2.38
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  5.55        10.78       2243.6           
-  traversal: 3553236 rays traced, 26.26 box tests and 3.36 triangle tests per ray
+gpu_bvh_opt                  5.37        11.78       2317.6           
+  traversal: 3553236 rays traced, 27.81 box tests and 2.00 triangle tests per ray
+
+>>> bunny --build gpu_ploc --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_gpu_ploc --csv results\build_render.csv
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (33 ms)
+BVH (gpu_ploc): 71669 nodes, 35835 leaves (avg 1.94 tris), depth 22, SAH cost 41.00, built in 3.75 ms
+  stages (ms): bounds 0.08, morton 0.01, sort 0.40, cluster 3.07, convert 0.19; mesh upload 107.97, tree download 2.26
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                        847.77       847.77         14.7           
+gpu_bvh_opt                  5.17         8.71       2405.7     163.9x
+gpu_bvh_persistent           5.31         9.15       2345.2     159.8x
+
+>>> bunny --build gpu_ploc --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (33 ms)
+BVH (gpu_ploc): 71669 nodes, 35835 leaves (avg 1.94 tris), depth 22, SAH cost 41.00, built in 4.01 ms
+  stages (ms): bounds 0.08, morton 0.01, sort 0.41, cluster 3.32, convert 0.20; mesh upload 102.43, tree download 1.95
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_opt                  5.41        10.63       2300.9           
+  traversal: 3553236 rays traced, 28.78 box tests and 1.97 triangle tests per ray
 
 >>> dragon --build cpu_sah --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_cpu_sah --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (280 ms)
-BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 771.19 ms
-  stages (ms): sah 771.19
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (316 ms)
+BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 965.53 ms
+  stages (ms): sah 965.53
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-cpu                        988.80       988.80         12.6           
-gpu_bvh_opt                  9.05        25.57       1375.4     109.3x
-gpu_bvh_persistent           8.77        25.87       1418.8     112.8x
+cpu                       1054.08      1054.08         11.8           
+gpu_bvh_opt                  8.51        25.43       1461.5     123.8x
+gpu_bvh_persistent           8.20        25.25       1517.1     128.5x
 
 >>> dragon --build cpu_sah --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (279 ms)
-BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 762.73 ms
-  stages (ms): sah 762.73
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (308 ms)
+BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 788.97 ms
+  stages (ms): sah 788.97
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  7.26        24.54       1712.7           
+gpu_bvh_opt                  6.87        24.24       1810.4           
   traversal: 3466267 rays traced, 30.91 box tests and 2.21 triangle tests per ray
 
 >>> dragon --build gpu_lbvh --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_gpu_lbvh --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (283 ms)
-BVH (gpu_lbvh): 639789 nodes, 319895 leaves (avg 2.72 tris), depth 34, SAH cost 71.06, built in 3.77 ms
-  stages (ms): bounds 0.24, morton 0.07, sort 0.85, hierarchy 0.20, fit 1.22, convert 1.19; mesh upload 107.59, tree download 18.16
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (303 ms)
+BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 3.95 ms
+  stages (ms): bounds 0.25, morton 0.07, sort 0.87, hierarchy 0.29, fit 1.03, convert 1.44; mesh upload 110.24, tree download 25.30
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-cpu                       1123.50      1123.50         11.1           
-gpu_bvh_opt                 11.32        26.08       1099.4      99.3x
-gpu_bvh_persistent           8.39        23.01       1482.1     133.8x
+cpu                       1149.67      1149.67         10.8           
+gpu_bvh_opt                 10.13        26.41       1228.5     113.5x
+gpu_bvh_persistent           7.85        24.60       1585.2     146.5x
 
 >>> dragon --build gpu_lbvh --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (279 ms)
-BVH (gpu_lbvh): 639789 nodes, 319895 leaves (avg 2.72 tris), depth 34, SAH cost 71.06, built in 3.82 ms
-  stages (ms): bounds 0.24, morton 0.07, sort 0.88, hierarchy 0.20, fit 0.92, convert 1.51; mesh upload 104.17, tree download 18.52
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (297 ms)
+BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 3.91 ms
+  stages (ms): bounds 0.24, morton 0.07, sort 0.85, hierarchy 0.27, fit 1.04, convert 1.44; mesh upload 115.16, tree download 26.49
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  8.65        23.78       1438.9           
-  traversal: 3466267 rays traced, 35.63 box tests and 3.45 triangle tests per ray
+gpu_bvh_opt                  8.13        26.49       1529.8           
+  traversal: 3466267 rays traced, 36.90 box tests and 2.38 triangle tests per ray
+
+>>> dragon --build gpu_ploc --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_gpu_ploc --csv results\build_render.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (295 ms)
+BVH (gpu_ploc): 910573 nodes, 455287 leaves (avg 1.91 tris), depth 33, SAH cost 63.57, built in 11.81 ms
+  stages (ms): bounds 0.24, morton 0.07, sort 0.83, cluster 8.44, convert 2.23; mesh upload 102.72, tree download 24.61
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                       1135.77      1135.77         11.0           
+gpu_bvh_opt                  9.76        25.29       1274.4     116.3x
+gpu_bvh_persistent           7.65        24.09       1627.0     148.5x
+
+>>> dragon --build gpu_ploc --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (299 ms)
+BVH (gpu_ploc): 910573 nodes, 455287 leaves (avg 1.91 tris), depth 33, SAH cost 63.57, built in 11.82 ms
+  stages (ms): bounds 0.25, morton 0.07, sort 0.85, cluster 8.40, convert 2.26; mesh upload 110.41, tree download 27.61
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_opt                  8.00        26.72       1554.5           
+  traversal: 3466267 rays traced, 34.88 box tests and 2.29 triangle tests per ray
 
 >>> buddha --build cpu_sah --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_cpu_sah --csv results\build_render.csv
-Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (354 ms)
-BVH (cpu_sah): 1190261 nodes, 595131 leaves (avg 1.83 tris), depth 26, SAH cost 65.25, built in 1035.55 ms
-  stages (ms): sah 1035.55
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (372 ms)
+BVH (cpu_sah): 1190261 nodes, 595131 leaves (avg 1.83 tris), depth 26, SAH cost 65.25, built in 956.81 ms
+  stages (ms): sah 956.81
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-cpu                        936.19       936.19         13.3           
-gpu_bvh_opt                  9.26        28.60       1344.0     101.1x
-gpu_bvh_persistent           8.90        28.09       1398.2     105.2x
+cpu                        971.81       971.81         12.8           
+gpu_bvh_opt                  8.58        28.18       1449.5     113.2x
+gpu_bvh_persistent           7.33        26.02       1697.2     132.6x
 
 >>> buddha --build cpu_sah --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
-Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (347 ms)
-BVH (cpu_sah): 1190261 nodes, 595131 leaves (avg 1.83 tris), depth 26, SAH cost 65.25, built in 983.34 ms
-  stages (ms): sah 983.34
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (378 ms)
+BVH (cpu_sah): 1190261 nodes, 595131 leaves (avg 1.83 tris), depth 26, SAH cost 65.25, built in 965.82 ms
+  stages (ms): sah 965.82
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  7.48        28.83       1663.4           
+gpu_bvh_opt                  7.13        28.45       1745.6           
   traversal: 3344427 rays traced, 30.50 box tests and 2.21 triangle tests per ray
 
 >>> buddha --build gpu_lbvh --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_gpu_lbvh --csv results\build_render.csv
-Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (354 ms)
-BVH (gpu_lbvh): 805627 nodes, 402814 leaves (avg 2.70 tris), depth 35, SAH cost 85.05, built in 5.84 ms
-  stages (ms): bounds 0.31, morton 0.09, sort 1.38, hierarchy 0.33, fit 1.42, convert 2.31; mesh upload 116.99, tree download 23.36
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (372 ms)
+BVH (gpu_lbvh): 1170519 nodes, 585260 leaves (avg 1.86 tris), depth 35, SAH cost 83.73, built in 6.34 ms
+  stages (ms): bounds 0.30, morton 0.09, sort 1.46, hierarchy 0.51, fit 1.62, convert 2.37; mesh upload 129.26, tree download 36.41
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-cpu                       1128.35      1128.35         11.0           
-gpu_bvh_opt                 12.23        29.31       1017.5      92.3x
-gpu_bvh_persistent           9.66        27.02       1288.0     116.8x
+cpu                       1150.93      1150.93         10.8           
+gpu_bvh_opt                 10.99        30.74       1132.4     104.8x
+gpu_bvh_persistent           8.81        28.59       1412.1     130.6x
 
 >>> buddha --build gpu_lbvh --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
-Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (352 ms)
-BVH (gpu_lbvh): 805627 nodes, 402814 leaves (avg 2.70 tris), depth 35, SAH cost 85.05, built in 4.52 ms
-  stages (ms): bounds 0.29, morton 0.09, sort 1.06, hierarchy 0.46, fit 1.14, convert 1.48; mesh upload 114.14, tree download 23.88
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (385 ms)
+BVH (gpu_lbvh): 1170519 nodes, 585260 leaves (avg 1.86 tris), depth 35, SAH cost 83.73, built in 4.79 ms
+  stages (ms): bounds 0.29, morton 0.09, sort 1.02, hierarchy 0.33, fit 1.29, convert 1.78; mesh upload 116.26, tree download 30.13
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  9.46        29.33       1315.2           
-  traversal: 3344427 rays traced, 35.82 box tests and 3.52 triangle tests per ray
+gpu_bvh_opt                  9.06        30.99       1372.6           
+  traversal: 3344427 rays traced, 37.18 box tests and 2.38 triangle tests per ray
+
+>>> buddha --build gpu_ploc --width 1920 --height 1080 --ao 4 --mode cpu,gpu_bvh_opt,gpu_bvh_persistent --runs 5 --cpu-runs 3 --tag quality_gpu_ploc --csv results\build_render.csv
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (383 ms)
+BVH (gpu_ploc): 1138819 nodes, 569410 leaves (avg 1.91 tris), depth 35, SAH cost 71.96, built in 13.93 ms
+  stages (ms): bounds 0.30, morton 0.09, sort 1.27, cluster 9.52, convert 2.76; mesh upload 118.04, tree download 33.36
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+cpu                       1099.27      1099.27         11.3           
+gpu_bvh_opt                  9.79        28.98       1270.7     112.3x
+gpu_bvh_persistent           7.90        27.02       1575.1     139.2x
+
+>>> buddha --build gpu_ploc --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 1 --warmup 0 --tag quality --stats-csv results\traversal.csv
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (386 ms)
+BVH (gpu_ploc): 1138819 nodes, 569410 leaves (avg 1.91 tris), depth 35, SAH cost 71.96, built in 13.34 ms
+  stages (ms): bounds 0.29, morton 0.09, sort 1.03, cluster 9.17, convert 2.76; mesh upload 119.13, tree download 29.39
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_opt                  8.18        30.88       1520.2           
+  traversal: 3344427 rays traced, 34.02 box tests and 2.27 triangle tests per ray
 
 >>> dragon --build cpu_sah --width 1920 --height 1080 --ao 0 --mode gpu_bvh_opt --runs 5 --tag rays_cpu_sah --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (279 ms)
-BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 754.00 ms
-  stages (ms): sah 754.00
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (318 ms)
+BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 853.01 ms
+  stages (ms): sah 853.01
 Render 1920x1080, 0 AO samples, ~4.1 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  3.47        19.54       1194.3           
+gpu_bvh_opt                  2.93        19.64       1415.0           
 
 >>> dragon --build gpu_lbvh --width 1920 --height 1080 --ao 0 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_lbvh --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (278 ms)
-BVH (gpu_lbvh): 639789 nodes, 319895 leaves (avg 2.72 tris), depth 34, SAH cost 71.06, built in 4.72 ms
-  stages (ms): bounds 0.25, morton 0.07, sort 1.11, hierarchy 0.27, fit 1.13, convert 1.90; mesh upload 113.57, tree download 18.85
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (314 ms)
+BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 5.01 ms
+  stages (ms): bounds 0.25, morton 0.07, sort 1.10, hierarchy 0.40, fit 1.30, convert 1.89; mesh upload 113.29, tree download 27.22
 Render 1920x1080, 0 AO samples, ~4.1 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  3.61        18.83       1148.8           
+gpu_bvh_opt                  3.55        20.91       1169.7           
+
+>>> dragon --build gpu_ploc --width 1920 --height 1080 --ao 0 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_ploc --csv results\build_render.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (314 ms)
+BVH (gpu_ploc): 910573 nodes, 455287 leaves (avg 1.91 tris), depth 33, SAH cost 63.57, built in 12.15 ms
+  stages (ms): bounds 0.25, morton 0.07, sort 0.95, cluster 8.52, convert 2.36; mesh upload 113.52, tree download 23.20
+Render 1920x1080, 0 AO samples, ~4.1 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_opt                  3.10        18.35       1335.8           
 
 >>> dragon --build cpu_sah --width 1920 --height 1080 --ao 1 --mode gpu_bvh_opt --runs 5 --tag rays_cpu_sah --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (278 ms)
-BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 751.64 ms
-  stages (ms): sah 751.64
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (318 ms)
+BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 841.71 ms
+  stages (ms): sah 841.71
 Render 1920x1080, 1 AO samples, ~6.2 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  4.36        20.16       1426.4           
+gpu_bvh_opt                  3.63        20.47       1713.6           
 
 >>> dragon --build gpu_lbvh --width 1920 --height 1080 --ao 1 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_lbvh --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (278 ms)
-BVH (gpu_lbvh): 639789 nodes, 319895 leaves (avg 2.72 tris), depth 34, SAH cost 71.06, built in 4.58 ms
-  stages (ms): bounds 0.25, morton 0.07, sort 1.09, hierarchy 0.26, fit 1.46, convert 1.46; mesh upload 115.99, tree download 19.22
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (315 ms)
+BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 4.95 ms
+  stages (ms): bounds 0.25, morton 0.07, sort 1.08, hierarchy 0.35, fit 1.30, convert 1.89; mesh upload 111.46, tree download 23.43
 Render 1920x1080, 1 AO samples, ~6.2 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  5.64        19.69       1103.8           
+gpu_bvh_opt                  5.24        22.40       1187.8           
+
+>>> dragon --build gpu_ploc --width 1920 --height 1080 --ao 1 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_ploc --csv results\build_render.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (321 ms)
+BVH (gpu_ploc): 910573 nodes, 455287 leaves (avg 1.91 tris), depth 33, SAH cost 63.57, built in 14.49 ms
+  stages (ms): bounds 0.25, morton 0.08, sort 1.58, cluster 10.01, convert 2.57; mesh upload 126.78, tree download 31.25
+Render 1920x1080, 1 AO samples, ~6.2 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_opt                  5.23        21.33       1189.0           
 
 >>> dragon --build cpu_sah --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 5 --tag rays_cpu_sah --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (284 ms)
-BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 786.24 ms
-  stages (ms): sah 786.24
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (314 ms)
+BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 840.45 ms
+  stages (ms): sah 840.45
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                  9.05        25.15       1375.1           
+gpu_bvh_opt                  6.88        24.85       1807.3           
 
 >>> dragon --build gpu_lbvh --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_lbvh --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (283 ms)
-BVH (gpu_lbvh): 639789 nodes, 319895 leaves (avg 2.72 tris), depth 34, SAH cost 71.06, built in 4.06 ms
-  stages (ms): bounds 0.25, morton 0.07, sort 1.02, hierarchy 0.25, fit 1.07, convert 1.40; mesh upload 112.33, tree download 18.46
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (313 ms)
+BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 5.12 ms
+  stages (ms): bounds 0.25, morton 0.07, sort 1.28, hierarchy 0.35, fit 1.30, convert 1.88; mesh upload 116.60, tree download 29.13
 Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                 10.10        23.85       1231.3           
+gpu_bvh_opt                 10.22        26.24       1217.5           
+
+>>> dragon --build gpu_ploc --width 1920 --height 1080 --ao 4 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_ploc --csv results\build_render.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (300 ms)
+BVH (gpu_ploc): 910573 nodes, 455287 leaves (avg 1.91 tris), depth 33, SAH cost 63.57, built in 11.85 ms
+  stages (ms): bounds 0.25, morton 0.07, sort 1.08, cluster 8.12, convert 2.34; mesh upload 119.20, tree download 26.69
+Render 1920x1080, 4 AO samples, ~12.4 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_opt                  8.22        23.26       1514.0           
 
 >>> dragon --build cpu_sah --width 1920 --height 1080 --ao 16 --mode gpu_bvh_opt --runs 5 --tag rays_cpu_sah --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (302 ms)
-BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 754.35 ms
-  stages (ms): sah 754.35
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (312 ms)
+BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 761.01 ms
+  stages (ms): sah 761.01
 Render 1920x1080, 16 AO samples, ~37.3 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                 22.60        38.56       1651.4           
+gpu_bvh_opt                 19.38        34.48       1925.6           
 
 >>> dragon --build gpu_lbvh --width 1920 --height 1080 --ao 16 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_lbvh --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (286 ms)
-BVH (gpu_lbvh): 639789 nodes, 319895 leaves (avg 2.72 tris), depth 34, SAH cost 71.06, built in 3.47 ms
-  stages (ms): bounds 0.25, morton 0.07, sort 0.86, hierarchy 0.20, fit 0.92, convert 1.18; mesh upload 109.15, tree download 18.61
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (290 ms)
+BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 3.90 ms
+  stages (ms): bounds 0.24, morton 0.07, sort 0.83, hierarchy 0.26, fit 1.04, convert 1.45; mesh upload 108.40, tree download 27.57
 Render 1920x1080, 16 AO samples, ~37.3 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                 25.17        39.31       1483.2           
+gpu_bvh_opt                 23.15        38.46       1612.4           
+
+>>> dragon --build gpu_ploc --width 1920 --height 1080 --ao 16 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_ploc --csv results\build_render.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (302 ms)
+BVH (gpu_ploc): 910573 nodes, 455287 leaves (avg 1.91 tris), depth 33, SAH cost 63.57, built in 11.86 ms
+  stages (ms): bounds 0.24, morton 0.07, sort 0.86, cluster 8.44, convert 2.24; mesh upload 113.18, tree download 28.94
+Render 1920x1080, 16 AO samples, ~37.3 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_opt                 21.91        37.76       1703.2           
 
 >>> dragon --build cpu_sah --width 1920 --height 1080 --ao 64 --mode gpu_bvh_opt --runs 5 --tag rays_cpu_sah --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (279 ms)
-BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 752.70 ms
-  stages (ms): sah 752.70
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (298 ms)
+BVH (cpu_sah): 959001 nodes, 479501 leaves (avg 1.82 tris), depth 26, SAH cost 57.50, built in 802.66 ms
+  stages (ms): sah 802.66
 Render 1920x1080, 64 AO samples, ~136.9 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                 74.44        89.89       1838.5           
+gpu_bvh_opt                 71.51        87.37       1913.7           
 
 >>> dragon --build gpu_lbvh --width 1920 --height 1080 --ao 64 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_lbvh --csv results\build_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (285 ms)
-BVH (gpu_lbvh): 639789 nodes, 319895 leaves (avg 2.72 tris), depth 34, SAH cost 71.06, built in 3.47 ms
-  stages (ms): bounds 0.24, morton 0.07, sort 0.85, hierarchy 0.20, fit 0.92, convert 1.19; mesh upload 172.54, tree download 18.42
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (300 ms)
+BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 4.56 ms
+  stages (ms): bounds 0.26, morton 0.08, sort 1.45, hierarchy 0.27, fit 1.05, convert 1.46; mesh upload 117.94, tree download 29.27
 Render 1920x1080, 64 AO samples, ~136.9 M rays/frame
 GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
 
 mode                    kernel ms       e2e ms      Mrays/s    speedup
-gpu_bvh_opt                 91.76       105.68       1491.5           
+gpu_bvh_opt                 85.21       100.76       1606.1           
+
+>>> dragon --build gpu_ploc --width 1920 --height 1080 --ao 64 --mode gpu_bvh_opt --runs 5 --tag rays_gpu_ploc --csv results\build_render.csv
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (299 ms)
+BVH (gpu_ploc): 910573 nodes, 455287 leaves (avg 1.91 tris), depth 33, SAH cost 63.57, built in 11.35 ms
+  stages (ms): bounds 0.24, morton 0.07, sort 0.86, cluster 7.93, convert 2.25; mesh upload 105.62, tree download 21.58
+Render 1920x1080, 64 AO samples, ~136.9 M rays/frame
+GPU: NVIDIA GeForce RTX 2060 (sm_75, 30 SMs, 6.0 GB), 4.99 GB free
+
+mode                    kernel ms       e2e ms      Mrays/s    speedup
+gpu_bvh_opt                 79.61        95.58       1719.0           
 
 >>> dragon --dynamic --frames 60 --width 1280 --height 720 --ao 4 --dynamic-csv results\dynamic.csv --out renders\explode.png
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (288 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (310 ms)
 Dynamic scene: dragon exploding, 871414 triangles, 60 frames, 1280x720, 4 AO
-frame      t | cpu_sah rebuild (upd+render) | gpu_lbvh rebuild             | gpu refit                   
-    0  0.000 |   850.6+ 17.4 ms  SAH   57.5 |     3.6+  3.9 ms  SAH   71.1 |     3.9+  3.0 ms  SAH   71.1
-    1  0.017 |   876.9+ 23.9 ms  SAH  104.9 |     3.6+  6.7 ms  SAH  127.3 |     1.1+ 21.8 ms  SAH  391.9
-    2  0.034 |   910.1+ 24.2 ms  SAH  129.3 |     4.9+  8.1 ms  SAH  155.1 |     1.2+ 75.2 ms  SAH 1115.7
-    3  0.051 |   931.5+ 24.9 ms  SAH  144.4 |     4.3+  8.7 ms  SAH  172.0 |     1.4+147.2 ms  SAH 2161.5
-    4  0.068 |   955.4+ 36.9 ms  SAH  153.9 |     4.1+  9.3 ms  SAH  182.8 |     1.0+256.5 ms  SAH 3465.4
-    5  0.085 |   928.4+ 27.5 ms  SAH  160.6 |     3.8+ 10.3 ms  SAH  190.1 |     0.9+413.2 ms  SAH 4974.9
-    6  0.102 |   948.8+ 25.7 ms  SAH  164.8 |     3.9+ 12.1 ms  SAH  195.2 |     1.6+660.9 ms  SAH 6646.9
-    7  0.119 |   946.7+ 27.8 ms  SAH  167.8 |     4.5+ 10.6 ms  SAH  198.5 |     1.0+794.5 ms  SAH 8443.6
-    8  0.136 |   936.4+ 27.9 ms  SAH  169.9 |     5.2+ 12.5 ms  SAH  200.5 |     1.0+1167.5 ms  SAH 10328.2
-    9  0.153 |   937.4+ 29.0 ms  SAH  171.3 |     4.0+ 13.6 ms  SAH  201.7 |     1.0+1505.1 ms  SAH 12281.0
-   10  0.169 |   935.5+ 29.2 ms  SAH  172.4 |     4.1+ 14.3 ms  SAH  202.8 |     1.0+1907.9 ms  SAH 14284.6
-   11  0.186 |   958.5+ 29.9 ms  SAH  173.1 |     5.3+ 13.4 ms  SAH  203.7 |     1.6+2252.9 ms  SAH 16323.0
-   12  0.203 |   981.5+ 29.5 ms  SAH  173.7 |     5.2+ 14.2 ms  SAH  204.0 |     1.3+2647.6 ms  SAH 18383.3
-   13  0.220 |   959.2+ 27.4 ms  SAH  174.0 |     5.3+ 18.6 ms  SAH  204.4 |     0.9+3119.8 ms  SAH 20454.5
-   14  0.237 |   997.0+ 29.2 ms  SAH  174.1 |     4.2+ 12.3 ms  SAH  204.4 |     1.0+3694.4 ms  SAH 22527.9
-   15  0.254 |  1008.3+ 29.5 ms  SAH  174.3 |     4.4+ 14.7 ms  SAH  204.3 |     1.0+4010.0 ms  SAH 24596.3
-   16  0.271 |  1011.4+ 30.2 ms  SAH  174.2 |     5.2+ 14.8 ms  SAH  204.4 |     1.0+4649.8 ms  SAH 26653.6
-   17  0.288 |  1025.0+ 30.9 ms  SAH  174.4 |     5.5+ 14.9 ms  SAH  204.3 |     1.0+5223.4 ms  SAH 28689.0
-   18  0.305 |  1025.1+ 27.2 ms  SAH  174.3 |     5.4+ 15.2 ms  SAH  204.3 |     1.0+5852.7 ms  SAH 30704.2
-   19  0.322 |  1048.0+ 30.4 ms  SAH  174.2 |     4.3+ 15.5 ms  SAH  204.2 |     1.0+6512.2 ms  SAH 32695.9
-   20  0.339 |  1041.8+ 30.3 ms  SAH  174.3 |     4.7+ 16.2 ms  SAH  204.2 |     1.0+7176.1 ms  SAH 34649.6
-   21  0.356 |  1050.2+ 32.4 ms  SAH  174.0 |     4.4+ 16.1 ms  SAH  204.0 |     1.0+7937.1 ms  SAH 36571.5
-   22  0.373 |  1061.4+ 31.5 ms  SAH  173.9 |     5.1+ 16.4 ms  SAH  203.8 |     1.0+8654.6 ms  SAH 38463.3
-   23  0.390 |  1109.2+ 30.9 ms  SAH  173.9 |     5.6+ 16.4 ms  SAH  203.4 |     1.0+9296.2 ms  SAH 40324.0
-   24  0.407 |  1023.9+ 31.2 ms  SAH  173.6 |     4.8+ 16.7 ms  SAH  203.3 |     1.0+10185.0 ms  SAH 42152.8
-   25  0.424 |  1042.6+ 32.6 ms  SAH  173.4 |     4.4+ 17.7 ms  SAH  203.0 |     1.0+11047.3 ms  SAH 43943.7
-   26  0.441 |  1090.0+ 31.6 ms  SAH  173.5 |     4.6+ 17.3 ms  SAH  202.8 |     1.0+11689.8 ms  SAH 45701.6
-   27  0.458 |  1005.7+ 28.7 ms  SAH  173.3 |     4.4+ 18.0 ms  SAH  202.6 |     1.0+11985.4 ms  SAH 47426.7
-   28  0.475 |  1007.4+ 29.0 ms  SAH  173.2 |     4.5+ 14.6 ms  SAH  202.4 |     0.9+11662.7 ms  SAH 49118.8
-   29  0.492 |  1030.0+ 29.7 ms  SAH  173.0 |     4.5+ 14.9 ms  SAH  202.1 |     0.9+12425.0 ms  SAH 50778.3
-   30  0.508 |  1019.2+ 29.2 ms  SAH  172.8 |     4.5+ 15.1 ms  SAH  201.9 |     0.9+13179.1 ms  SAH 52405.4
-   31  0.525 |  1019.8+ 29.2 ms  SAH  172.6 |     4.5+ 15.3 ms  SAH  201.6 |     0.9+13979.7 ms  SAH 54000.4
-   32  0.542 |  1055.1+ 29.6 ms  SAH  172.4 |     4.5+ 15.4 ms  SAH  201.4 |     0.9+14817.0 ms  SAH 55563.9
-   33  0.559 |  1030.7+ 29.7 ms  SAH  172.3 |     4.5+ 15.7 ms  SAH  201.1 |     0.9+15661.4 ms  SAH 57096.2
-   34  0.576 |  1037.4+ 31.6 ms  SAH  172.2 |     4.5+ 15.8 ms  SAH  200.8 |     0.9+16440.4 ms  SAH 58598.0
-   35  0.593 |  1034.2+ 30.4 ms  SAH  172.0 |     4.5+ 16.0 ms  SAH  200.6 |     0.9+17320.1 ms  SAH 60069.7
-   36  0.610 |  1068.7+ 30.9 ms  SAH  171.7 |     4.5+ 16.1 ms  SAH  200.3 |     0.9+18161.9 ms  SAH 61512.0
-   37  0.627 |  1047.8+ 30.1 ms  SAH  171.6 |     4.5+ 16.2 ms  SAH  200.2 |     0.9+19023.1 ms  SAH 62925.3
-   38  0.644 |  1070.6+ 30.6 ms  SAH  171.4 |     4.5+ 16.4 ms  SAH  200.0 |     0.9+19956.9 ms  SAH 64310.4
-   39  0.661 |  1056.7+ 31.8 ms  SAH  171.2 |     4.5+ 16.6 ms  SAH  199.8 |     0.9+20916.5 ms  SAH 65667.8
-   40  0.678 |  1059.0+ 31.1 ms  SAH  171.1 |     4.5+ 16.7 ms  SAH  199.7 |     0.9+21791.0 ms  SAH 66998.2
-   41  0.695 |  1056.4+ 30.9 ms  SAH  171.1 |     4.6+ 17.0 ms  SAH  199.6 |     0.9+22725.4 ms  SAH 68302.1
-   42  0.712 |  1061.0+ 30.7 ms  SAH  170.8 |     4.6+ 17.2 ms  SAH  199.5 |     0.9+23657.4 ms  SAH 69580.2
-   43  0.729 |  1082.0+ 30.8 ms  SAH  170.7 |     4.6+ 17.4 ms  SAH  199.3 |     0.9+24618.7 ms  SAH 70833.1
-   44  0.746 |  1070.0+ 30.9 ms  SAH  170.6 |     4.6+ 17.3 ms  SAH  199.1 |     0.9+25677.4 ms  SAH 72061.4
-   45  0.763 |  1069.5+ 31.3 ms  SAH  170.4 |     4.6+ 17.6 ms  SAH  199.0 |     0.9+26612.8 ms  SAH 73265.6
-   46  0.780 |  1071.6+ 30.7 ms  SAH  170.3 |     4.6+ 17.6 ms  SAH  199.0 |     0.9+27555.3 ms  SAH 74446.4
-   47  0.797 |  1067.9+ 32.2 ms  SAH  170.3 |     4.6+ 17.7 ms  SAH  199.0 |     0.9+28565.4 ms  SAH 75604.3
-   48  0.814 |  1076.7+ 31.3 ms  SAH  169.9 |     4.6+ 18.0 ms  SAH  198.9 |     0.9+29538.3 ms  SAH 76739.9
-   49  0.831 |  1075.3+ 31.3 ms  SAH  170.0 |     4.6+ 18.3 ms  SAH  198.6 |     0.9+30655.8 ms  SAH 77853.7
-   50  0.847 |  1104.8+ 32.4 ms  SAH  169.7 |     4.6+ 18.6 ms  SAH  198.6 |     0.9+31855.8 ms  SAH 78946.3
-   51  0.864 |  1085.9+ 32.4 ms  SAH  169.6 |     4.6+ 18.4 ms  SAH  198.6 |     0.9+32565.5 ms  SAH 80018.2
-   52  0.881 |  1090.6+ 31.7 ms  SAH  169.5 |     4.6+ 18.8 ms  SAH  198.3 |     0.9+33742.0 ms  SAH 81069.9
-   53  0.898 |  1097.5+ 31.8 ms  SAH  169.5 |     4.6+ 18.8 ms  SAH  198.0 |     0.9+34914.6 ms  SAH 82100.9
-   54  0.915 |  1093.3+ 32.5 ms  SAH  169.3 |     4.6+ 19.1 ms  SAH  198.0 |     0.9+35716.4 ms  SAH 83110.6
-   55  0.932 |  1096.9+ 31.9 ms  SAH  169.4 |     4.6+ 18.9 ms  SAH  198.0 |     0.9+36863.4 ms  SAH 84101.5
-   56  0.949 |  1090.3+ 32.2 ms  SAH  169.4 |     4.6+ 19.2 ms  SAH  198.0 |     0.9+37979.9 ms  SAH 85073.2
-   57  0.966 |  1101.4+ 32.2 ms  SAH  169.2 |     4.6+ 19.5 ms  SAH  197.7 |     0.9+39142.2 ms  SAH 86026.4
-   58  0.983 |  1103.1+ 32.1 ms  SAH  169.2 |     4.6+ 19.2 ms  SAH  197.7 |     0.9+40228.3 ms  SAH 86962.2
-   59  1.000 |  1114.3+ 32.6 ms  SAH  169.0 |     4.6+ 19.9 ms  SAH  197.7 |     0.9+41407.9 ms  SAH 87881.1
+frame      t | cpu_sah rebuild (upd+render) | gpu_lbvh rebuild             | gpu refit                    | gpu_ploc rebuild            
+    0  0.000 |   801.5+ 16.7 ms  SAH   57.5 |     3.9+  3.5 ms  SAH   70.0 |     3.9+  3.2 ms  SAH   70.0 |    12.1+  2.7 ms  SAH   63.6
+    1  0.017 |   938.0+ 25.0 ms  SAH  104.9 |     4.1+  6.4 ms  SAH  120.0 |     1.1+ 20.2 ms  SAH  368.4 |    12.5+  5.8 ms  SAH  114.5
+    2  0.034 |   947.8+ 25.7 ms  SAH  129.3 |     5.1+  7.6 ms  SAH  143.9 |     1.2+ 68.1 ms  SAH 1035.3 |    13.4+  7.1 ms  SAH  139.9
+    3  0.051 |   962.9+ 24.5 ms  SAH  144.4 |     5.1+  8.2 ms  SAH  158.5 |     1.2+135.5 ms  SAH 1997.2 |    12.3+  7.7 ms  SAH  156.4
+    4  0.068 |  1004.7+ 25.5 ms  SAH  153.9 |     4.3+  9.0 ms  SAH  167.8 |     1.1+242.4 ms  SAH 3195.5 |    12.3+  8.4 ms  SAH  166.6
+    5  0.085 |   970.4+ 26.2 ms  SAH  160.6 |     4.3+  9.0 ms  SAH  174.1 |     1.0+366.5 ms  SAH 4582.1 |    11.7+  8.8 ms  SAH  173.4
+    6  0.102 |   971.2+ 26.4 ms  SAH  164.8 |     4.3+  9.7 ms  SAH  178.4 |     1.0+533.1 ms  SAH 6117.6 |    12.1+  9.5 ms  SAH  178.6
+    7  0.119 |   938.4+ 26.1 ms  SAH  167.8 |     4.3+ 10.1 ms  SAH  181.2 |     1.0+740.7 ms  SAH 7767.2 |    11.8+ 10.0 ms  SAH  181.2
+    8  0.136 |   937.0+ 26.9 ms  SAH  169.9 |     4.4+ 10.2 ms  SAH  183.0 |     1.0+967.1 ms  SAH 9497.4 |    11.8+ 10.2 ms  SAH  183.7
+    9  0.153 |   938.8+ 26.2 ms  SAH  171.3 |     4.4+ 10.4 ms  SAH  183.9 |     1.0+1202.1 ms  SAH 11290.1 |    12.1+ 10.7 ms  SAH  185.5
+   10  0.169 |   951.5+ 26.7 ms  SAH  172.4 |     4.5+ 10.4 ms  SAH  184.8 |     1.0+1566.9 ms  SAH 13129.3 |    12.0+ 10.9 ms  SAH  186.6
+   11  0.186 |   961.8+ 27.3 ms  SAH  173.1 |     4.5+ 10.8 ms  SAH  185.6 |     1.0+1878.1 ms  SAH 15000.3 |    12.0+ 10.8 ms  SAH  187.4
+   12  0.203 |   969.6+ 27.1 ms  SAH  173.7 |     4.5+ 10.8 ms  SAH  185.9 |     1.0+2218.5 ms  SAH 16891.3 |    11.9+ 11.2 ms  SAH  187.4
+   13  0.220 |   957.4+ 26.9 ms  SAH  174.0 |     4.6+ 11.5 ms  SAH  186.1 |     1.0+2619.9 ms  SAH 18792.2 |    11.7+ 11.6 ms  SAH  188.3
+   14  0.237 |   956.6+ 27.9 ms  SAH  174.1 |     4.6+ 11.1 ms  SAH  186.0 |     1.0+3014.5 ms  SAH 20695.2 |    13.6+ 11.5 ms  SAH  188.1
+   15  0.254 |  1002.7+ 27.4 ms  SAH  174.3 |     4.6+ 11.3 ms  SAH  186.0 |     0.9+3473.0 ms  SAH 22593.4 |    12.2+ 11.6 ms  SAH  188.2
+   16  0.271 |   992.0+ 27.3 ms  SAH  174.2 |     4.6+ 11.3 ms  SAH  186.0 |     1.0+3901.5 ms  SAH 24481.4 |    12.1+ 11.9 ms  SAH  188.1
+   17  0.288 |   999.9+ 28.6 ms  SAH  174.4 |     4.6+ 11.6 ms  SAH  185.8 |     1.0+4399.0 ms  SAH 26349.4 |    12.1+ 11.9 ms  SAH  188.1
+   18  0.305 |  1000.7+ 28.1 ms  SAH  174.3 |     4.7+ 11.8 ms  SAH  185.8 |     1.0+4958.9 ms  SAH 28198.6 |    12.2+ 12.3 ms  SAH  189.0
+   19  0.322 |  1004.6+ 27.2 ms  SAH  174.2 |     4.7+ 12.0 ms  SAH  185.7 |     1.0+5468.7 ms  SAH 30026.4 |    12.2+ 12.7 ms  SAH  189.0
+   20  0.339 |  1025.2+ 30.1 ms  SAH  174.3 |     4.7+ 12.1 ms  SAH  185.6 |     1.0+6073.8 ms  SAH 31819.2 |    12.2+ 13.0 ms  SAH  188.9
+   21  0.356 |  1028.4+ 28.5 ms  SAH  174.0 |     4.7+ 12.2 ms  SAH  185.5 |     1.0+6595.2 ms  SAH 33582.9 |    12.1+ 12.8 ms  SAH  188.5
+   22  0.373 |   985.4+ 28.6 ms  SAH  173.9 |     4.7+ 12.3 ms  SAH  185.2 |     1.0+7238.6 ms  SAH 35318.9 |    12.1+ 13.0 ms  SAH  187.8
+   23  0.390 |   987.3+ 29.1 ms  SAH  173.9 |     4.8+ 12.6 ms  SAH  184.9 |     1.0+7887.5 ms  SAH 37026.3 |    12.3+ 12.9 ms  SAH  187.5
+   24  0.407 |   994.5+ 28.6 ms  SAH  173.6 |     4.8+ 12.7 ms  SAH  184.8 |     1.0+8490.7 ms  SAH 38704.4 |    12.2+ 14.1 ms  SAH  188.4
+   25  0.424 |   995.1+ 28.4 ms  SAH  173.4 |     4.8+ 13.0 ms  SAH  184.5 |     1.0+9197.3 ms  SAH 40347.8 |    12.3+ 13.6 ms  SAH  187.5
+   26  0.441 |  1000.3+ 29.1 ms  SAH  173.5 |     4.8+ 13.0 ms  SAH  184.3 |     1.0+9863.4 ms  SAH 41960.9 |    12.3+ 13.6 ms  SAH  187.1
+   27  0.458 |  1013.6+ 29.7 ms  SAH  173.3 |     4.8+ 13.3 ms  SAH  184.2 |     1.0+10623.1 ms  SAH 43543.7 |    12.6+ 13.9 ms  SAH  187.5
+   28  0.475 |  1023.2+ 30.5 ms  SAH  173.2 |     4.8+ 13.1 ms  SAH  183.9 |     1.0+11338.8 ms  SAH 45096.4 |    11.8+ 14.1 ms  SAH  187.0
+   29  0.492 |  1016.9+ 29.6 ms  SAH  173.0 |     4.8+ 13.7 ms  SAH  183.7 |     1.0+11958.7 ms  SAH 46619.1 |    13.3+ 14.5 ms  SAH  187.2
+   30  0.508 |  1022.2+ 29.3 ms  SAH  172.8 |     4.8+ 13.6 ms  SAH  183.5 |     1.0+12820.5 ms  SAH 48112.1 |    12.4+ 14.4 ms  SAH  186.9
+   31  0.525 |  1024.8+ 30.1 ms  SAH  172.6 |     4.9+ 13.8 ms  SAH  183.2 |     1.0+13616.0 ms  SAH 49575.7 |    12.4+ 14.7 ms  SAH  186.5
+   32  0.542 |  1058.6+ 29.5 ms  SAH  172.4 |     4.9+ 14.0 ms  SAH  183.0 |     1.0+14451.0 ms  SAH 51010.3 |    12.4+ 15.0 ms  SAH  185.9
+   33  0.559 |  1053.2+ 30.1 ms  SAH  172.3 |     4.9+ 14.2 ms  SAH  182.7 |     1.0+15318.8 ms  SAH 52416.4 |    12.6+ 16.0 ms  SAH  186.9
+   34  0.576 |  1039.0+ 29.9 ms  SAH  172.2 |     4.9+ 14.2 ms  SAH  182.4 |     1.0+16024.3 ms  SAH 53794.3 |    12.6+ 15.3 ms  SAH  185.2
+   35  0.593 |  1042.6+ 29.9 ms  SAH  172.0 |     4.9+ 14.3 ms  SAH  182.3 |     1.0+16892.9 ms  SAH 55144.7 |    12.4+ 15.2 ms  SAH  185.8
+   36  0.610 |  1045.3+ 30.9 ms  SAH  171.7 |     4.9+ 14.5 ms  SAH  182.0 |     1.0+17837.9 ms  SAH 56468.1 |    12.5+ 15.6 ms  SAH  185.1
+   37  0.627 |  1044.4+ 30.4 ms  SAH  171.6 |     4.9+ 14.6 ms  SAH  181.9 |     1.0+18652.4 ms  SAH 57764.9 |    13.3+ 15.3 ms  SAH  185.3
+   38  0.644 |  1054.3+ 30.7 ms  SAH  171.4 |     4.9+ 14.9 ms  SAH  181.8 |     1.0+19411.9 ms  SAH 59035.8 |    12.4+ 15.7 ms  SAH  185.1
+   39  0.661 |  1067.6+ 30.5 ms  SAH  171.2 |     4.9+ 15.2 ms  SAH  181.6 |     1.0+20411.1 ms  SAH 60281.3 |    12.5+ 16.7 ms  SAH  185.6
+   40  0.678 |  1061.6+ 30.8 ms  SAH  171.1 |     4.9+ 15.0 ms  SAH  181.5 |     1.0+21257.5 ms  SAH 61502.0 |    12.5+ 15.8 ms  SAH  185.8
+   41  0.695 |  1410.9+ 32.7 ms  SAH  171.1 |     4.9+ 15.2 ms  SAH  181.4 |     1.0+24031.9 ms  SAH 62698.4 |    12.6+ 17.7 ms  SAH  184.8
+   42  0.712 |  1201.4+ 31.3 ms  SAH  170.8 |     4.9+ 15.6 ms  SAH  181.3 |     1.1+27650.6 ms  SAH 63871.1 |    12.7+ 16.7 ms  SAH  185.1
+   43  0.729 |  1331.1+ 34.9 ms  SAH  170.7 |     4.9+ 15.3 ms  SAH  181.2 |     1.0+25991.0 ms  SAH 65020.7 |    13.5+ 21.2 ms  SAH  185.1
+   44  0.746 |  1266.7+ 39.9 ms  SAH  170.6 |     6.0+ 17.0 ms  SAH  181.0 |     1.1+27683.9 ms  SAH 66147.7 |    15.5+ 17.1 ms  SAH  184.6
+   45  0.763 |  1246.0+ 34.2 ms  SAH  170.4 |     5.2+ 18.7 ms  SAH  180.8 |     1.1+28858.3 ms  SAH 67252.6 |    13.5+ 18.4 ms  SAH  185.6
+   46  0.780 |  1192.6+ 35.2 ms  SAH  170.3 |     5.0+ 17.1 ms  SAH  180.9 |     1.1+30035.4 ms  SAH 68336.0 |    12.6+ 17.3 ms  SAH  184.7
+   47  0.797 |  1197.3+ 35.7 ms  SAH  170.3 |     6.1+ 18.7 ms  SAH  180.8 |     1.1+31457.8 ms  SAH 69398.4 |    12.6+ 16.9 ms  SAH  184.6
+   48  0.814 |  1086.1+ 31.8 ms  SAH  169.9 |     5.0+ 19.5 ms  SAH  180.7 |     1.1+30490.6 ms  SAH 70440.4 |    12.7+ 16.9 ms  SAH  183.9
+   49  0.831 |  1101.6+ 31.6 ms  SAH  170.0 |     5.0+ 16.1 ms  SAH  180.6 |     1.0+30005.5 ms  SAH 71462.3 |    12.7+ 18.1 ms  SAH  185.1
+   50  0.847 |  1105.8+ 32.5 ms  SAH  169.7 |     5.0+ 16.4 ms  SAH  180.5 |     1.0+31103.9 ms  SAH 72464.8 |    12.7+ 17.7 ms  SAH  184.1
+   51  0.864 |  1107.7+ 32.1 ms  SAH  169.6 |     5.0+ 16.5 ms  SAH  180.5 |     1.0+31969.5 ms  SAH 73448.3 |    12.6+ 17.5 ms  SAH  184.1
+   52  0.881 |  1200.0+ 36.1 ms  SAH  169.5 |     5.0+ 16.5 ms  SAH  180.3 |     1.0+33082.9 ms  SAH 74413.3 |    12.7+ 17.2 ms  SAH  183.5
+   53  0.898 |  1147.0+ 34.2 ms  SAH  169.5 |     5.0+ 16.2 ms  SAH  180.1 |     1.0+34244.6 ms  SAH 75359.3 |    13.4+ 17.6 ms  SAH  183.4
+   54  0.915 |  1369.3+ 33.4 ms  SAH  169.3 |     5.0+ 16.6 ms  SAH  180.0 |     1.0+35112.1 ms  SAH 76285.7 |    13.7+ 17.7 ms  SAH  184.0
+   55  0.932 |  1122.5+ 32.1 ms  SAH  169.4 |     5.0+ 16.6 ms  SAH  180.0 |     0.9+36367.8 ms  SAH 77194.9 |    12.6+ 17.7 ms  SAH  183.4
+   56  0.949 |  1118.7+ 32.6 ms  SAH  169.4 |     5.0+ 16.8 ms  SAH  179.9 |     1.0+37213.6 ms  SAH 78086.5 |    13.1+ 18.2 ms  SAH  183.8
+   57  0.966 |  1115.2+ 32.5 ms  SAH  169.2 |     5.0+ 16.8 ms  SAH  179.7 |     1.0+38418.2 ms  SAH 78961.0 |    12.8+ 18.1 ms  SAH  183.9
+   58  0.983 |  1106.4+ 32.5 ms  SAH  169.2 |     5.0+ 17.0 ms  SAH  179.7 |     1.0+39535.9 ms  SAH 79819.7 |    12.6+ 17.8 ms  SAH  183.8
+   59  1.000 |  1119.3+ 31.6 ms  SAH  169.0 |     5.0+ 17.1 ms  SAH  179.7 |     1.0+40641.6 ms  SAH 80662.8 |    12.8+ 18.7 ms  SAH  184.4
 
 mean per frame (update + render, animation excluded):
-  cpu_sah_rebuild      1059.1 ms  (  0.9 fps), mean SAH cost 167.0
-  gpu_lbvh_rebuild       20.1 ms  ( 49.7 fps), mean SAH cost 195.8
-  gpu_refit           15705.1 ms  (  0.1 fps), mean SAH cost 47790.8
+  cpu_sah_rebuild      1085.3 ms  (  0.9 fps), mean SAH cost 167.0
+  gpu_lbvh_rebuild       18.2 ms  ( 55.0 fps), mean SAH cost 178.3
+  gpu_refit           15461.6 ms  (  0.1 fps), mean SAH cost 43875.5
+  gpu_ploc_rebuild       26.6 ms  ( 37.7 fps), mean SAH cost 180.8
 
 wrote results\build*.csv, traversal.csv, dynamic.csv; plot with: py scripts\plot_build.py

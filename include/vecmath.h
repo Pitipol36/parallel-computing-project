@@ -107,6 +107,36 @@ HD float aabb_area(const AABB& b) {
     return 2.0f * (e.x * e.y + e.y * e.z + e.z * e.x);
 }
 
+// Round-to-nearest arithmetic with no multiply-add contraction, for values the CPU and GPU
+// must compute bit-identically (tree-building decisions).
+HD float fmul_rn(float a, float b) {
+#ifdef __CUDA_ARCH__
+    return __fmul_rn(a, b);
+#else
+    return a * b;
+#endif
+}
+HD float fadd_rn(float a, float b) {
+#ifdef __CUDA_ARCH__
+    return __fadd_rn(a, b);
+#else
+    return a + b;
+#endif
+}
+HD float fsub_rn(float a, float b) {
+#ifdef __CUDA_ARCH__
+    return __fsub_rn(a, b);
+#else
+    return a - b;
+#endif
+}
+
+// Surface area with fmul_rn/fadd_rn (bit-identical on host and device).
+HD float box_area_rn(vec3 lo, vec3 hi) {
+    const float ex = fsub_rn(hi.x, lo.x), ey = fsub_rn(hi.y, lo.y), ez = fsub_rn(hi.z, lo.z);
+    return 2.0f * fadd_rn(fadd_rn(fmul_rn(ex, ey), fmul_rn(ey, ez)), fmul_rn(ez, ex));
+}
+
 // A ray plus its precomputed reciprocal direction (zero components nudged to a tiny
 // signed value so the slab test never computes 0 * inf).
 struct Ray {
