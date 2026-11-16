@@ -9,6 +9,7 @@
 #include "builders.h"
 #include "morton.h"
 #include "ploc.h"
+#include "hploc.h"
 #include "ply_loader.h"
 #include "render.h"
 #include "trace.h"
@@ -383,6 +384,81 @@ void test_ploc_builders() {
     }
 }
 
+void test_hploc_builders() {
+    std::string gdesc, err;
+    size_t fb, tb;
+    const bool gpu = gpu_info(gdesc, fb, tb);
+    // Bottom-up parent choice: for keys 1, 2, 4 the leaves 0 and 1 pair up first (Apetrei).
+    {
+        const uint64_t k[3] = {1, 2, 4};
+        bool left0, left1, left2;
+        check(hploc_parent(k, 3, 0, 0, left0) == 0 && left0, "leaf 0 is the left child of split 0");
+        check(hploc_parent(k, 3, 1, 1, left1) == 0 && !left1, "leaf 1 is the right child of split 0");
+        check(hploc_parent(k, 3, 2, 2, left2) == 1 && !left2, "leaf 2 is the right child of split 1");
+        bool l01;
+        check(hploc_parent(k, 3, 0, 1, l01) == 1 && l01, "node [0,1] is the left child of split 1");
+    }
+    struct Case { const char* name; Mesh mesh; int leaf, radius, threshold; };
+    std::vector<Case> cases;
+    Mesh one;
+    one.vertices = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+    one.faces = {{0, 1, 2}};
+    cases.push_back({"n = 1", one, 4, 8, 16});
+    Mesh two = one;
+    two.vertices.push_back({5, 5, 5});
+    two.vertices.push_back({6, 5, 5});
+    two.vertices.push_back({5, 6, 5});
+    two.faces.push_back({3, 4, 5});
+    cases.push_back({"n = 2", two, 1, 8, 16});
+    Mesh three = two;
+    three.vertices.push_back({0, 0, 9});
+    three.vertices.push_back({1, 0, 9});
+    three.vertices.push_back({0, 1, 9});
+    three.faces.push_back({6, 7, 8});
+    cases.push_back({"n = 3", three, 1, 8, 16});
+    Mesh same;  // 200 copies of one triangle: every Morton key identical
+    same.vertices = one.vertices;
+    for (int i = 0; i < 200; ++i) same.faces.push_back({0, 1, 2});
+    cases.push_back({"200 identical triangles", same, 4, 8, 16});
+    cases.push_back({"icosphere(4)", make_icosphere(4), 4, 8, 16});
+    cases.push_back({"icosphere(4), threshold 1", make_icosphere(4), 4, 8, 1});
+    cases.push_back({"test scene, radius 2, threshold 4", make_test_scene(3), 2, 2, 4});
+    cases.push_back({"icosphere(5), radius 16", make_icosphere(5), 4, 16, 16});
+    Mesh dup = make_icosphere(2);
+    size_t nf = dup.faces.size();
+    for (size_t i = 0; i < nf; ++i) dup.faces.push_back(dup.faces[i]);
+    cases.push_back({"duplicated icosphere(2)", dup, 4, 8, 16});
+    for (Case& c : cases) {
+        BuildParams bp;
+        bp.maxLeaf = c.leaf;
+        bp.hplocRadius = c.radius;
+        bp.hplocThreshold = c.threshold;
+        std::printf("  H-PLOC on %s (%zu tris, leaf=%d, r=%d, threshold=%d)\n", c.name, c.mesh.faces.size(), c.leaf,
+                    c.radius, c.threshold);
+        BVH cpu = build_hploc_cpu(c.mesh, bp, nullptr);
+        if (c.mesh.faces.size() > 100 && c.mesh.faces.size() != 200) {
+            check_bvh(c.mesh, cpu);
+            const double sh = tree_stats(cpu).sahCost, sl = tree_stats(build_lbvh_cpu(c.mesh, bp, nullptr)).sahCost;
+            std::printf("    SAH cost %.2f (LBVH %.2f)\n", sh, sl);
+        } else {
+            std::string rep;
+            bool v = validate_bvh(cpu, rep);
+            if (!v) std::printf("%s", rep.c_str());
+            check(v, "small H-PLOC tree is valid");
+        }
+        if (!gpu) continue;
+        BVH g;
+        BuildReport rep;
+        bool built = build_hploc_gpu(c.mesh, bp, &g, nullptr, &rep, err);
+        if (!built) std::printf("    %s\n", err.c_str());
+        check(built, "GPU H-PLOC builds");
+        std::string why;
+        bool same_ = built && same_bvh(cpu, g, why);
+        if (built && !same_) std::printf("    %s\n", why.c_str());
+        check(same_, "GPU H-PLOC flattens to the same tree as the CPU twin");
+    }
+}
+
 void test_trbvh_builders() {
     std::string gdesc, err;
     size_t fb, tb;
@@ -450,6 +526,7 @@ int run_unit_tests() {
     test_lbvh_builders();
     test_ploc_builders();
     test_trbvh_builders();
+    test_hploc_builders();
     std::printf("Unit tests: %d/%d checks passed -> %s\n", g_checks - g_failures, g_checks,
                 g_failures ? "FAIL" : "PASS");
     return g_failures;

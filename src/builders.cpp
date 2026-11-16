@@ -15,6 +15,8 @@ const char* builder_name(BuilderKind b) {
         case BuilderKind::CpuTrbvh: return "cpu_trbvh";
         case BuilderKind::GpuTrbvh: return "gpu_trbvh";
         case BuilderKind::CpuSahFull: return "cpu_sah_full";
+        case BuilderKind::CpuHploc: return "cpu_hploc";
+        case BuilderKind::GpuHploc: return "gpu_hploc";
     }
     return "?";
 }
@@ -22,7 +24,7 @@ const char* builder_name(BuilderKind b) {
 bool parse_builder(const std::string& s, BuilderKind& b) {
     for (BuilderKind k : {BuilderKind::CpuSah, BuilderKind::CpuLbvh, BuilderKind::GpuLbvh, BuilderKind::CpuPloc,
                           BuilderKind::GpuPloc, BuilderKind::CpuTrbvh, BuilderKind::GpuTrbvh,
-                          BuilderKind::CpuSahFull})
+                          BuilderKind::CpuSahFull, BuilderKind::CpuHploc, BuilderKind::GpuHploc})
         if (s == builder_name(k)) { b = k; return true; }
     return false;
 }
@@ -54,6 +56,11 @@ bool build_with(BuilderKind kind, const Mesh& mesh, const BuildParams& params, B
         case BuilderKind::CpuSahFull:
             out = build_sah_full_cpu(mesh, params, &report);
             return true;
+        case BuilderKind::CpuHploc:
+            out = build_hploc_cpu(mesh, params, &report);
+            return true;
+        case BuilderKind::GpuHploc:
+            return build_hploc_gpu(mesh, params, &out, nullptr, &report, err);
     }
     err = "unknown builder";
     return false;

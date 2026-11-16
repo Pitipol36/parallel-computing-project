@@ -37,7 +37,9 @@ struct BuildParams {
     bool sahCollapse = true;
     int trbvhPasses = 3;   // TRBVH restructuring passes (gamma doubles each pass)
     int trbvhTreelet = 7;  // TRBVH treelet leaves (2..7)
-    bool trbvhWarp = true;  // GPU TRBVH: one warp per treelet (false: one thread per treelet)  // binary-tree builders: collapse a subtree into a leaf only when SAH says so
+    bool trbvhWarp = true;
+    int hplocRadius = 8;      // H-PLOC nearest-neighbour search within a cluster list
+    int hplocThreshold = 16;  // H-PLOC: merge a node's list when it holds more clusters (<= 16)  // GPU TRBVH: one warp per treelet (false: one thread per treelet)  // binary-tree builders: collapse a subtree into a leaf only when SAH says so
 };
 
 struct BVH {

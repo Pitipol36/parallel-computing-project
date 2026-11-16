@@ -7,6 +7,7 @@
 //   cpu_trbvh LBVH + TRBVH treelet restructuring (Karras & Aila 2013), single-threaded
 //   gpu_trbvh the same on the GPU, one warp per treelet; identical to cpu_trbvh
 //   cpu_sah_full full-sweep SAH (every split on every axis): the tree-quality reference
+//   cpu_hploc / gpu_hploc  H-PLOC (Benthin et al. 2024); one kernel launch on the GPU
 // Every builder emits the same flattened BVH (BVHNode + Tri), so all render modes run
 // unchanged on any tree.
 #pragma once
@@ -18,7 +19,7 @@
 #include "bvh.h"
 #include "mesh.h"
 
-enum class BuilderKind { CpuSah, CpuLbvh, GpuLbvh, CpuPloc, GpuPloc, CpuTrbvh, GpuTrbvh, CpuSahFull };
+enum class BuilderKind { CpuSah, CpuLbvh, GpuLbvh, CpuPloc, GpuPloc, CpuTrbvh, GpuTrbvh, CpuSahFull, CpuHploc, GpuHploc };
 
 const char* builder_name(BuilderKind b);
 bool parse_builder(const std::string& s, BuilderKind& b);
@@ -103,6 +104,30 @@ private:
 BVH build_ploc_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);
 bool build_ploc_gpu(const Mesh& mesh, const BuildParams& params, BVH* hostOut, DeviceBvh* devOut,
                     BuildReport* report, std::string& err);
+
+// Reusable GPU H-PLOC builder (buffers persist; builds from device-resident vertices).
+class GpuHplocBuilder {
+public:
+    GpuHplocBuilder();
+    ~GpuHplocBuilder();
+    GpuHplocBuilder(const GpuHplocBuilder&) = delete;
+    GpuHplocBuilder& operator=(const GpuHplocBuilder&) = delete;
+    bool reserve(int numTris, std::string& err);
+    bool build(const void* dVerts, const void* dFaces, int numTris, const BuildParams& params, BuildReport* report,
+               std::string& err);
+    const DeviceBvh& tree() const;  // owned by the builder
+    bool download(BVH& out, std::string& err) const;
+    DeviceBvh take_tree();          // caller releases
+
+private:
+    struct Impl;
+    Impl* impl_;
+};
+
+// H-PLOC: CPU twin and single-launch GPU builder; their flattened trees are identical.
+BVH build_hploc_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);
+bool build_hploc_gpu(const Mesh& mesh, const BuildParams& params, BVH* hostOut, DeviceBvh* devOut,
+                     BuildReport* report, std::string& err);
 
 // Full-sweep SAH reference builder (CPU, O(n log^2 n)).
 BVH build_sah_full_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);

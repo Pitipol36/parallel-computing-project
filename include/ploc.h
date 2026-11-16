@@ -26,10 +26,15 @@ HD float ploc_merged_area(vec3 alo, vec3 ahi, vec3 blo, vec3 bhi) {
 }
 
 // For cluster i: is candidate j at distance d better than the current best bj at bd?
-// Pairs are ordered by (distance, smaller index, larger index), a strict total order.
+// Pairs are ordered by (distance, index gap, parity of the smaller index, smaller index, larger
+// index), a strict total order. On exact distance ties (identical boxes) the gap and parity
+// terms make neighbours pair up as (0,1), (2,3), ... so ties merge in balanced rounds instead
+// of one pair per iteration (which would build a chain as deep as the number of triangles).
 HD bool ploc_better(float d, int i, int j, float bd, int bj) {
     if (d != bd) return d < bd;
     const int lo = i < j ? i : j, hi = i < j ? j : i;
     const int blo = i < bj ? i : bj, bhi = i < bj ? bj : i;
+    if (hi - lo != bhi - blo) return hi - lo < bhi - blo;
+    if ((lo & 1) != (blo & 1)) return (lo & 1) < (blo & 1);
     return lo != blo ? lo < blo : hi < bhi;
 }
