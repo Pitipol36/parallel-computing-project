@@ -214,7 +214,7 @@ nearby pixels take similar paths through the tree.
 the single-threaded build was now most of the time to the first image. So I built the BVH on the
 GPU, first with Karras's LBVH. Every triangle gets a Morton code, a radix sort puts them along a
 space-filling curve, one thread per node builds the hierarchy, and a bottom-up pass with atomic
-counters fits the boxes. On the Buddha it takes 6 milliseconds instead of almost a second: 160
+counters fits the boxes. On the dragon it takes under 5 milliseconds instead of almost a second: 160
 times faster than the CPU SAH build, and 67 times faster than the same algorithm on one core. Every
 GPU builder has a single-threaded twin, and the GPU tree is checked to be identical to it.
 
@@ -222,9 +222,9 @@ GPU builder has a single-threaded twin, and the GPU tree is checked to be identi
 
 The speed has a price. Morton order ignores surface area, so the boxes are looser: on the scans
 the tree costs 19 to 30 percent more by SAH, rays do about a fifth more box tests, and rendering is
-10 to 24 percent slower. *[Point to the "mixed sizes" row.]* On a scene with mixed triangle sizes
+12 to 21 percent slower. *[Point to the "mixed sizes" row.]* On a scene with mixed triangle sizes
 it is much worse. But it only matters when a tree serves many rays: the SAH tree catches up after
-about 5 billion rays, roughly 400 full-HD frames.
+about 6.5 billion rays, roughly 500 full-HD frames.
 
 ## Slide 19: Winning the quality back: PLOC and TRBVH (0:45)
 
@@ -232,7 +232,7 @@ Two higher-quality GPU builders win that back. PLOC clusters bottom-up: every cl
 nearest neighbour among its Morton-order neighbours, mutual pairs merge, and a scan I wrote myself,
 the scan lab's pattern, compacts the list. That gets within 12 percent of the best tree. TRBVH starts
 from the LBVH and, under every large node, finds the optimal shape for a treelet of seven subtrees
-with a small dynamic program, one warp per treelet. That gets within 6 percent, in 58
+with a small dynamic program, one warp per treelet. That gets within 6 percent, in 70
 milliseconds.
 
 ## Slide 20: H-PLOC: PLOC quality in one kernel launch (0:40)
@@ -241,8 +241,8 @@ PLOC's weakness is its loop: 68 iterations on the dragon, each with several kern
 readback to the CPU. H-PLOC, from last year, builds the whole tree in one launch. Threads climb the
 Morton hierarchy from the leaves; each node carries a short list of clusters, and when two
 children's lists together exceed sixteen, the whole warp merges them in shared memory. Same
-quality as PLOC, 1.3 to almost 4 times faster. The paper gets within about 15 percent of the LBVH;
-mine takes about twice the LBVH's time, and I know where that goes.
+quality as PLOC, 1.4 to 4 times faster. The paper gets within about 15 percent of the LBVH;
+mine takes 1.4 to 1.9 times the LBVH's time, and I know where that goes.
 
 ## Slide 21: A harder scene and a stronger reference (0:45)
 
@@ -250,7 +250,7 @@ mine takes about twice the LBVH's time, and I know where that goes.
 size. So I added a scene with mixed sizes: huge ground triangles, thin pillars, and objects at very
 different scales. And I replaced the binned SAH reference with a full sweep that tries every split.
 On the scans binning is within one percent of it; on the mixed scene it is 11 percent worse, and
-**TRBVH beats the CPU SAH builder** while building 19 times faster. I also made the timing fairer:
+**TRBVH beats the CPU SAH builder** while building 16 times faster. I also made the timing fairer:
 warm-up, eleven interleaved runs and medians. The clocks can't be locked without admin rights, so
 the quality claims rest on SAH cost and traversal counters, which are deterministic.
 
@@ -258,7 +258,7 @@ the quality claims rest on SAH cost and traversal counters, which are determinis
 
 All the builders on one chart: build time against tree quality, lower left is better. Every GPU
 builder is on the front. LBVH is the fastest and the loosest, H-PLOC is the middle ground, and
-TRBVH gets closest to the reference while still building 16 times faster than the CPU. So the right
+TRBVH gets closest to the reference while still building 13 to 16 times faster than the CPU. So the right
 builder depends on how many rays one tree will serve.
 
 ## Slide 23: Parallel reinsertion: past the CPU reference (0:40)
@@ -269,15 +269,15 @@ same nodes are applied together: each one locks its six nodes with an atomic max
 move, and the boxes are refitted. After eight rounds every GPU tree is within a few percent of the
 full-sweep reference on the scans, and TRBVH plus PRBVH beats it. On the mixed scene all four end up
 5 to 15 percent **better** than the full sweep, which is still greedy at the top. H-PLOC plus PRBVH
-builds the dragon in 240 milliseconds with a better tree than the CPU builder's 760. Renders get 8
-to 43 percent faster, so the extra time pays off after 11 to 65 frames.
+builds the dragon in 150 milliseconds with a better tree than the CPU builder's 770. Renders get 16
+to 42 percent faster, so the extra time pays off after 11 to 50 frames.
 
 ## Slide 24: Dynamic scenes: rebuild every frame (0:30)
 
 *[Let the animation play.]* Where a fast build really matters is a scene that changes every frame.
 The dragon explodes. Refitting the old tree costs a millisecond, but its boxes stretch across the
 explosion and rendering slows to tens of seconds per frame. Rebuilding on the GPU every frame keeps
-the tree good at 12 to 34 frames per second; the CPU needs one and a half seconds per frame.
+the tree good at 17 to 56 frames per second; the CPU needs about a second per frame.
 
 ## Slide 25: Limitations and future work (0:25)
 
@@ -289,7 +289,7 @@ leaf collapse into the build. And I'd still like to try the 28-million-triangle 
 
 To sum up: going from my ten-sphere Python ray tracer to a million triangles took two steps. A BVH
 made each ray's search logarithmic, and the GPU ran millions of those searches at once. And now the
-GPU builds that tree too: in milliseconds close to the best CPU builder's quality, or in a quarter
+GPU builds that tree too: in milliseconds close to the best CPU builder's quality, or in a sixth
 of a second better than it. Thank you,
 and I'm happy to take questions.
 

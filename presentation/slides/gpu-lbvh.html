@@ -1,7 +1,7 @@
 <section id="gpu-lbvh" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
 <h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Follow-up: building the BVH on the GPU</h2>
 <div style="display:flex;gap:64px">
-<img src="/_blob/a1efbc292a40fbe558a46540a56a1212" alt="Line chart, log scale: build time for bunny, dragon, buddha and the mixed scene. CPU binned SAH 63 to 1,116 ms; GPU LBVH 0.5 to 6.1 ms; GPU H-PLOC 0.9 to 11.5 ms; GPU PLOC 3.5 to 15.5 ms; GPU TRBVH 7.5 to 58 ms; single-threaded CPU versions are 52 to 75 times slower than their GPU versions" style="width:900px;height:540px;object-fit:contain">
+<img src="/_blob/22006853fec8db9bf7bffe68cd059971" alt="Line chart, log scale: build time for bunny, dragon, buddha and the mixed scene. CPU binned SAH 56 to 989 ms; GPU LBVH 0.5 to 7.3 ms; GPU H-PLOC 0.9 to 12.7 ms; GPU PLOC 3.7 to 17.8 ms; GPU TRBVH 9.8 to 70 ms; single-threaded CPU versions are 43 to 77 times slower than their GPU versions" style="width:900px;height:540px;object-fit:contain">
 <div style="flex:1;display:flex;flex-direction:column;gap:28px">
 <p style="font-size:24px;line-height:1.4;color:#4A5263">Karras 2012 LBVH, one thread per element:</p>
 <ol style="font-size:26px;line-height:1.45;color:#1B2233;padding-left:36px">
@@ -14,10 +14,10 @@
 </ol>
 <div style="display:flex;flex-direction:column;gap:8px;background:#10172A;padding:32px;border-radius:16px">
 <p style="font-size:64px;font-weight:700;line-height:1.1;color:#F28A5E">160×</p>
-<p style="font-size:24px;line-height:1.4;color:#C9D1E0">faster than the CPU SAH build on the Buddha (955 → 6.0 ms); 67× faster than the same LBVH on one core</p>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">faster than the CPU SAH build on the dragon (769 → 4.8 ms); 67× faster than the same LBVH on one core</p>
 </div>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">17 · Median of 5 builds. Every GPU tree is node-for-node identical to its CPU version and renders the same hit IDs as the SAH tree.</p>
-<aside>After the presentation I tackled the biggest remaining cost: the single-threaded BVH build. The first GPU version is Karras's LBVH. Every triangle gets a 63-bit Morton code from its centroid, a radix sort orders them along a space-filling curve, and then one thread per internal node finds its range and split in parallel. A bottom-up pass with atomic counters fits the boxes, and a final pass decides by SAH cost which small subtrees become leaves and flattens the tree into exactly the node layout the render kernels already use. On the Buddha it builds in 6 milliseconds, 160 times faster than the CPU SAH builder and 67 times faster than the same LBVH algorithm on one core. The chart also shows the three higher-quality builders I come to next. Each GPU tree is bit-for-bit identical to its CPU version, and every builder renders exactly the same triangle per pixel.</aside>
+<aside>After the presentation I tackled the biggest remaining cost: the single-threaded BVH build. The first GPU version is Karras's LBVH. Every triangle gets a 63-bit Morton code from its centroid, a radix sort orders them along a space-filling curve, and then one thread per internal node finds its range and split in parallel. A bottom-up pass with atomic counters fits the boxes, and a final pass decides by SAH cost which small subtrees become leaves and flattens the tree into exactly the node layout the render kernels already use. On the dragon it builds in under 5 milliseconds, 160 times faster than the CPU SAH builder and 67 times faster than the same LBVH algorithm on one core. The chart also shows the three higher-quality builders I come to next. Each GPU tree is bit-for-bit identical to its CPU version, and every builder renders exactly the same triangle per pixel.</aside>
 </section>
