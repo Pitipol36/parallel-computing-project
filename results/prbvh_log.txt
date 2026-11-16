@@ -1,186 +1,186 @@
 
 >>> bunny --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize none --runs 5 --warmup 1 --validate --tag base --build-csv results\prbvh.csv
-Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (36 ms)
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (29 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh         0.51       2.16      43.37       22    38183      0
-gpu_ploc         7.84       3.01      41.00       22    35835     42
-gpu_hploc        0.77       2.25      40.57       21    35900      0
-gpu_trbvh        9.56       2.13      38.43       21    35760      0
+gpu_lbvh         0.51       1.80      43.37       22    38183      0
+gpu_ploc         4.09       2.00      41.00       22    35835     42
+gpu_hploc        0.93       1.72      40.57       21    35900      0
+gpu_trbvh        7.90       1.51      38.43       21    35760      0
 
 >>> bunny --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize prbvh --runs 5 --warmup 1 --validate --tag prbvh --build-csv results\prbvh.csv
-Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (36 ms)
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (31 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh        13.46       2.26      37.46       20    34906      0
-gpu_ploc        19.09       2.43      37.20       21    34850     42
-gpu_hploc       15.43       2.47      37.08       21    34854      0
-gpu_trbvh       21.33       2.07      36.89       20    34823      0
+gpu_lbvh         8.90       1.43      37.46       20    34906      0
+gpu_ploc        12.73       1.58      37.20       21    34850     42
+gpu_hploc        9.94       1.47      37.08       21    34854      0
+gpu_trbvh       14.22       1.36      36.89       20    34823      0
 
 >>> dragon --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize none --runs 5 --warmup 1 --validate --tag base --build-csv results\prbvh.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (368 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (281 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh         4.50      11.62      70.02       35   459666      0
-gpu_ploc        26.93      14.88      63.62       33   455275     68
-gpu_hploc       12.13      11.75      63.12       34   455682      0
-gpu_trbvh       75.41      11.20      60.52       34   426824      0
+gpu_lbvh         3.80       8.66      70.02       35   459666      0
+gpu_ploc        12.94      10.75      63.62       33   455275     68
+gpu_hploc        7.45       9.06      63.12       34   455682      0
+gpu_trbvh       49.36       9.03      60.52       34   426824      0
 
 >>> dragon --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize prbvh --runs 5 --warmup 1 --validate --tag prbvh --build-csv results\prbvh.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (375 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (276 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh       207.75      11.04      58.14       33   434563      0
-gpu_ploc       284.60      11.96      57.20       33   436939     68
-gpu_hploc      240.69      11.47      57.10       33   436983      0
-gpu_trbvh      274.68      10.83      56.66       34   428243      0
+gpu_lbvh       117.73       8.89      58.14       33   434563      0
+gpu_ploc       173.99      10.38      57.20       33   436939     68
+gpu_hploc      148.37       9.13      57.10       33   436983      0
+gpu_trbvh      155.56       8.77      56.66       34   428243      0
 
 >>> buddha --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize none --runs 5 --warmup 1 --validate --tag base --build-csv results\prbvh.csv
-Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (435 ms)
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (381 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh         7.79      12.92      83.73       35   585260      0
-gpu_ploc        26.21      16.04      72.50       35   569261     65
-gpu_hploc       16.57      13.64      72.66       38   569441      0
-gpu_trbvh      117.02      12.95      68.64       36   536742      0
+gpu_lbvh         5.03      10.94      83.73       35   585260      0
+gpu_ploc        14.29      13.18      72.50       35   569261     65
+gpu_hploc        9.51      11.05      72.66       38   569441      0
+gpu_trbvh       60.31      10.89      68.64       36   536742      0
 
 >>> buddha --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize prbvh --runs 5 --warmup 1 --validate --tag prbvh --build-csv results\prbvh.csv
-Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (439 ms)
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (350 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh       284.71      12.88      67.79       34   546278      0
-gpu_ploc       406.27      15.51      65.04       36   546657     65
-gpu_hploc      339.94      13.54      65.37       36   546497      0
-gpu_trbvh      359.96      12.85      64.01       34   535318      0
+gpu_lbvh       153.70      11.06      67.79       34   546278      0
+gpu_ploc       216.99      13.04      65.04       36   546657     65
+gpu_hploc      218.55      11.65      65.37       36   546497      0
+gpu_trbvh      192.14      10.89      64.01       34   535318      0
 
 >>> mixed --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize none --runs 5 --warmup 1 --validate --tag base --build-csv results\prbvh.csv
-Mixed-size scene: 546647 vertices, 1081503 triangles (409 ms)
+Mixed-size scene: 546647 vertices, 1081503 triangles (337 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh         8.87      12.84      34.94       39   591452      0
-gpu_ploc        24.82      15.95      22.74       39   563244     77
-gpu_hploc       16.61      13.14      23.34       39   563761      0
-gpu_trbvh      115.80      13.13      19.78       41   537908      0
+gpu_lbvh         5.85      11.42      34.94       39   591452      0
+gpu_ploc        16.47      13.66      22.74       39   563244     77
+gpu_hploc        9.89      12.05      23.34       39   563761      0
+gpu_trbvh       59.88      10.98      19.78       41   537908      0
 
 >>> mixed --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize prbvh --runs 5 --warmup 1 --validate --tag prbvh --build-csv results\prbvh.csv
-Mixed-size scene: 546647 vertices, 1081503 triangles (404 ms)
+Mixed-size scene: 546647 vertices, 1081503 triangles (323 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh       296.84      13.42      18.22       40   582945      0
-gpu_ploc       363.24      15.60      16.85       40   561560     77
-gpu_hploc      335.54      13.31      17.18       40   562008      0
-gpu_trbvh      366.16      12.76      16.26       42   536493      0
+gpu_lbvh       173.35      11.01      18.22       40   582945      0
+gpu_ploc       209.58      13.05      16.85       40   561560     77
+gpu_hploc      221.77      11.16      17.18       40   562008      0
+gpu_trbvh      207.00      10.74      16.26       42   536493      0
 
 >>> dragon --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --prbvh-iters 1 --runs 5 --warmup 1 --tag prbvh_iters --build-csv results\prbvh.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (354 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (284 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh        37.65      10.93      65.99       33   452630      0
-gpu_ploc        69.34      12.94      60.81       34   447336     68
-gpu_hploc       47.22      11.81      60.66       35   447615      0
-gpu_trbvh      112.72      11.77      58.56       34   427181      0
+gpu_lbvh        25.34       8.64      65.99       33   452630      0
+gpu_ploc        43.36      10.49      60.81       34   447336     68
+gpu_hploc       32.98       8.98      60.66       35   447615      0
+gpu_trbvh       64.41       8.59      58.56       34   427181      0
 
 >>> dragon --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --prbvh-iters 2 --runs 5 --warmup 1 --tag prbvh_iters --build-csv results\prbvh.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (346 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (305 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh        65.66      11.97      63.65       34   447797      0
-gpu_ploc       106.93      13.54      59.48       34   443228     68
-gpu_hploc       79.46      11.96      59.34       34   443509      0
-gpu_trbvh      139.10      10.99      57.77       34   427798      0
+gpu_lbvh        42.38       8.76      63.65       34   447797      0
+gpu_ploc        68.12      10.47      59.48       34   443228     68
+gpu_hploc       53.31      10.15      59.34       34   443509      0
+gpu_trbvh       78.49       8.66      57.77       34   427798      0
 
 >>> dragon --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --prbvh-iters 4 --runs 5 --warmup 1 --tag prbvh_iters --build-csv results\prbvh.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (356 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (288 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh       118.65      10.93      60.81       34   440976      0
-gpu_ploc       199.11      13.40      58.17       33   439125     68
-gpu_hploc      157.10      11.48      58.06       34   439381      0
-gpu_trbvh      203.19      10.84      57.02       34   428016      0
+gpu_lbvh        74.34       9.09      60.81       34   440976      0
+gpu_ploc       112.33      10.83      58.17       33   439125     68
+gpu_hploc       79.50       9.01      58.06       34   439381      0
+gpu_trbvh      121.51       9.09      57.02       34   428016      0
 
 >>> dragon --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --prbvh-iters 8 --runs 5 --warmup 1 --tag prbvh_iters --build-csv results\prbvh.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (355 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (284 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh       200.47      10.77      58.14       33   434563      0
-gpu_ploc       309.11      12.79      57.20       33   436939     68
-gpu_hploc      263.80      11.48      57.10       33   436983      0
-gpu_trbvh      274.25      11.06      56.66       34   428243      0
+gpu_lbvh       134.60       8.85      58.14       33   434563      0
+gpu_ploc       170.07      10.41      57.20       33   436939     68
+gpu_hploc      171.56       9.30      57.10       33   436983      0
+gpu_trbvh      153.89       8.58      56.66       34   428243      0
 
 >>> dragon --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --prbvh-iters 16 --runs 5 --warmup 1 --tag prbvh_iters --build-csv results\prbvh.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (347 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (281 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh       373.41      10.58      57.26       33   432370      0
-gpu_ploc       495.64      12.62      57.03       34   436633     68
-gpu_hploc      393.43      11.55      56.94       33   436713      0
-gpu_trbvh      434.30      10.96      56.50       34   428263      0
+gpu_lbvh       244.73       8.69      57.26       33   432370      0
+gpu_ploc       315.31      10.53      57.03       34   436633     68
+gpu_hploc      250.03       8.83      56.94       33   436713      0
+gpu_trbvh      288.97       8.76      56.50       34   428263      0
 
 >>> dragon --build-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --prbvh-iters 32 --runs 5 --warmup 1 --tag prbvh_iters --build-csv results\prbvh.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (374 ms)
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (283 ms)
 builder      build ms  upload ms   SAH cost    depth   leaves  iters
-gpu_lbvh       432.73      11.75      57.24       33   432305      0
-gpu_ploc       498.50      12.53      57.03       34   436633     68
-gpu_hploc      375.75      10.59      56.94       33   436713      0
-gpu_trbvh      464.43      10.73      56.50       34   428239      0
+gpu_lbvh       284.87       8.60      57.24       33   432305      0
+gpu_ploc       293.14      10.40      57.03       34   436633     68
+gpu_hploc      264.18       8.85      56.94       33   436713      0
+gpu_trbvh      256.88       8.64      56.50       34   428239      0
 
 >>> dragon --quality-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize none --width 1920 --height 1080 --ao 16 --mode gpu_bvh_opt --runs 11 --tag base --csv results\prbvh_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (349 ms)
-BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 6.01 ms
-  stages (ms): bounds 0.51, morton 0.08, sort 0.86, hierarchy 0.34, fit 1.42, convert 2.80; mesh upload 262.81, tree download 27.12
-BVH (gpu_ploc): 910549 nodes, 455275 leaves (avg 1.91 tris), depth 33, SAH cost 63.62, built in 18.95 ms
-  stages (ms): bounds 0.22, morton 0.43, sort 0.83, cluster 14.86, convert 2.61; mesh upload 13.92, tree download 32.88
-BVH (gpu_hploc): 911363 nodes, 455682 leaves (avg 1.91 tris), depth 34, SAH cost 63.12, built in 11.34 ms
-  stages (ms): bounds 0.96, morton 0.07, sort 1.15, cluster 6.34, convert 2.82; mesh upload 11.04, tree download 29.78
-BVH (gpu_trbvh): 853647 nodes, 426824 leaves (avg 2.04 tris), depth 34, SAH cost 60.52, built in 89.54 ms
-  stages (ms): bounds 0.22, morton 0.07, sort 0.83, hierarchy 0.19, fit 1.41, restructure 84.65, convert 2.17; mesh upload 10.30, tree download 26.70
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (280 ms)
+BVH (gpu_lbvh): 919331 nodes, 459666 leaves (avg 1.90 tris), depth 35, SAH cost 70.02, built in 4.01 ms
+  stages (ms): bounds 0.24, morton 0.07, sort 0.92, hierarchy 0.27, fit 1.05, convert 1.46; mesh upload 120.14, tree download 21.03
+BVH (gpu_ploc): 910549 nodes, 455275 leaves (avg 1.91 tris), depth 33, SAH cost 63.62, built in 13.91 ms
+  stages (ms): bounds 0.22, morton 0.07, sort 0.83, cluster 10.51, convert 2.28; mesh upload 10.83, tree download 20.77
+BVH (gpu_hploc): 911363 nodes, 455682 leaves (avg 1.91 tris), depth 34, SAH cost 63.12, built in 8.22 ms
+  stages (ms): bounds 0.22, morton 0.07, sort 0.82, cluster 4.61, convert 2.50; mesh upload 10.14, tree download 21.41
+BVH (gpu_trbvh): 853647 nodes, 426824 leaves (avg 2.04 tris), depth 34, SAH cost 60.52, built in 57.16 ms
+  stages (ms): bounds 0.22, morton 0.07, sort 1.35, hierarchy 0.19, fit 1.05, restructure 51.62, convert 2.66; mesh upload 9.46, tree download 20.54
 Quality bench: 1920x1080, 16 AO, 4 builders x 1 modes, 11 runs (round-robin)
 
 builder      mode                  median ms     p25 ms     p75 ms
-gpu_lbvh     gpu_bvh_opt               41.88      37.74      42.59
-gpu_ploc     gpu_bvh_opt               37.61      35.43      40.11
-gpu_hploc    gpu_bvh_opt               37.70      35.95      40.41
-gpu_trbvh    gpu_bvh_opt               35.96      33.97      36.59
+gpu_lbvh     gpu_bvh_opt               28.97      28.79      29.51
+gpu_ploc     gpu_bvh_opt               27.55      27.22      27.68
+gpu_hploc    gpu_bvh_opt               27.40      27.31      27.50
+gpu_trbvh    gpu_bvh_opt               25.41      24.63      25.97
 
 >>> dragon --quality-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize prbvh --width 1920 --height 1080 --ao 16 --mode gpu_bvh_opt --runs 11 --tag prbvh --csv results\prbvh_render.csv
-Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (355 ms)
-BVH (gpu_lbvh): 869125 nodes, 434563 leaves (avg 2.01 tris), depth 33, SAH cost 58.14, built in 199.10 ms
-  stages (ms): bounds 0.24, morton 0.07, sort 0.99, hierarchy 3.44, fit 3.59, optimize 186.71, convert 3.05; mesh upload 261.44, tree download 25.83
-BVH (gpu_ploc): 873877 nodes, 436939 leaves (avg 1.99 tris), depth 33, SAH cost 57.20, built in 282.77 ms
-  stages (ms): bounds 0.23, morton 0.07, sort 3.18, cluster 17.19, optimize 257.18, convert 4.93; mesh upload 13.03, tree download 26.63
-BVH (gpu_hploc): 873965 nodes, 436983 leaves (avg 1.99 tris), depth 33, SAH cost 57.10, built in 237.96 ms
-  stages (ms): bounds 0.23, morton 0.07, sort 0.83, cluster 6.29, optimize 225.94, convert 4.61; mesh upload 12.35, tree download 28.35
-BVH (gpu_trbvh): 856485 nodes, 428243 leaves (avg 2.03 tris), depth 34, SAH cost 56.66, built in 247.66 ms
-  stages (ms): bounds 0.22, morton 0.07, sort 0.86, hierarchy 0.19, fit 1.18, restructure 243.32, optimize 165.98, convert 1.82; mesh upload 11.04, tree download 27.07
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (281 ms)
+BVH (gpu_lbvh): 869125 nodes, 434563 leaves (avg 2.01 tris), depth 33, SAH cost 58.14, built in 120.06 ms
+  stages (ms): bounds 0.25, morton 0.07, sort 0.91, hierarchy 2.36, fit 1.05, optimize 112.06, convert 1.97; mesh upload 122.73, tree download 20.74
+BVH (gpu_ploc): 873877 nodes, 436939 leaves (avg 1.99 tris), depth 33, SAH cost 57.20, built in 208.57 ms
+  stages (ms): bounds 0.22, morton 0.07, sort 0.82, cluster 11.17, optimize 193.77, convert 2.52; mesh upload 10.90, tree download 24.13
+BVH (gpu_hploc): 873965 nodes, 436983 leaves (avg 1.99 tris), depth 33, SAH cost 57.10, built in 148.44 ms
+  stages (ms): bounds 0.22, morton 0.07, sort 0.82, cluster 4.10, optimize 140.46, convert 2.77; mesh upload 8.83, tree download 19.41
+BVH (gpu_trbvh): 856485 nodes, 428243 leaves (avg 2.03 tris), depth 34, SAH cost 56.66, built in 153.66 ms
+  stages (ms): bounds 0.23, morton 0.07, sort 0.90, hierarchy 0.19, fit 1.12, restructure 149.46, optimize 102.66, convert 1.68; mesh upload 9.10, tree download 20.18
 Quality bench: 1920x1080, 16 AO, 4 builders x 1 modes, 11 runs (round-robin)
 
 builder      mode                  median ms     p25 ms     p75 ms
-gpu_lbvh     gpu_bvh_opt               33.59      32.93      33.90
-gpu_ploc     gpu_bvh_opt               33.36      32.96      35.07
-gpu_hploc    gpu_bvh_opt               33.70      33.11      35.70
-gpu_trbvh    gpu_bvh_opt               32.92      32.66      33.83
+gpu_lbvh     gpu_bvh_opt               21.01      20.47      21.09
+gpu_ploc     gpu_bvh_opt               20.95      20.54      21.05
+gpu_hploc    gpu_bvh_opt               20.83      20.49      21.08
+gpu_trbvh    gpu_bvh_opt               20.43      19.86      20.55
 
 >>> mixed --quality-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize none --width 1920 --height 1080 --ao 16 --mode gpu_bvh_opt --runs 11 --tag base --csv results\prbvh_render.csv
-Mixed-size scene: 546647 vertices, 1081503 triangles (499 ms)
-BVH (gpu_lbvh): 1182903 nodes, 591452 leaves (avg 1.83 tris), depth 39, SAH cost 34.94, built in 6.07 ms
-  stages (ms): bounds 0.57, morton 0.09, sort 1.29, hierarchy 0.55, fit 1.61, convert 1.98; mesh upload 316.66, tree download 62.82
-BVH (gpu_ploc): 1126487 nodes, 563244 leaves (avg 1.92 tris), depth 39, SAH cost 22.74, built in 25.40 ms
-  stages (ms): bounds 0.28, morton 0.09, sort 1.01, cluster 20.62, convert 3.40; mesh upload 19.21, tree download 41.59
-BVH (gpu_hploc): 1127521 nodes, 563761 leaves (avg 1.92 tris), depth 39, SAH cost 23.34, built in 15.91 ms
-  stages (ms): bounds 0.59, morton 0.09, sort 4.27, cluster 7.92, convert 3.04; mesh upload 12.89, tree download 33.75
-BVH (gpu_trbvh): 1075815 nodes, 537908 leaves (avg 2.01 tris), depth 41, SAH cost 19.78, built in 97.02 ms
-  stages (ms): bounds 0.28, morton 0.09, sort 0.99, hierarchy 0.23, fit 1.29, restructure 91.77, convert 2.36; mesh upload 13.38, tree download 39.51
+Mixed-size scene: 546647 vertices, 1081503 triangles (339 ms)
+BVH (gpu_lbvh): 1182903 nodes, 591452 leaves (avg 1.83 tris), depth 39, SAH cost 34.94, built in 5.36 ms
+  stages (ms): bounds 0.31, morton 0.09, sort 1.05, hierarchy 0.33, fit 1.29, convert 2.29; mesh upload 124.48, tree download 25.97
+BVH (gpu_ploc): 1126487 nodes, 563244 leaves (avg 1.92 tris), depth 39, SAH cost 22.74, built in 14.20 ms
+  stages (ms): bounds 0.29, morton 0.09, sort 1.27, cluster 9.57, convert 3.00; mesh upload 14.74, tree download 25.82
+BVH (gpu_hploc): 1127521 nodes, 563761 leaves (avg 1.92 tris), depth 39, SAH cost 23.34, built in 9.19 ms
+  stages (ms): bounds 0.29, morton 0.09, sort 0.99, cluster 4.44, convert 3.38; mesh upload 11.78, tree download 25.67
+BVH (gpu_trbvh): 1075815 nodes, 537908 leaves (avg 2.01 tris), depth 41, SAH cost 19.78, built in 62.04 ms
+  stages (ms): bounds 0.28, morton 0.08, sort 0.99, hierarchy 0.24, fit 1.28, restructure 57.16, convert 2.01; mesh upload 12.06, tree download 25.06
 Quality bench: 1920x1080, 16 AO, 4 builders x 1 modes, 11 runs (round-robin)
 
 builder      mode                  median ms     p25 ms     p75 ms
-gpu_lbvh     gpu_bvh_opt               60.23      58.07      63.10
-gpu_ploc     gpu_bvh_opt               41.64      38.09      42.40
-gpu_hploc    gpu_bvh_opt               37.52      35.75      38.62
-gpu_trbvh    gpu_bvh_opt               35.29      34.08      37.71
+gpu_lbvh     gpu_bvh_opt               35.15      34.28      35.26
+gpu_ploc     gpu_bvh_opt               23.68      23.44      23.70
+gpu_hploc    gpu_bvh_opt               22.26      22.09      22.51
+gpu_trbvh    gpu_bvh_opt               21.64      21.22      21.70
 
 >>> mixed --quality-bench --build gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --optimize prbvh --width 1920 --height 1080 --ao 16 --mode gpu_bvh_opt --runs 11 --tag prbvh --csv results\prbvh_render.csv
-Mixed-size scene: 546647 vertices, 1081503 triangles (432 ms)
-BVH (gpu_lbvh): 1165889 nodes, 582945 leaves (avg 1.86 tris), depth 40, SAH cost 18.22, built in 310.86 ms
-  stages (ms): bounds 0.83, morton 0.09, sort 1.04, hierarchy 3.23, fit 1.30, optimize 298.28, convert 5.00; mesh upload 262.31, tree download 33.29
-BVH (gpu_ploc): 1123119 nodes, 561560 leaves (avg 1.93 tris), depth 40, SAH cost 16.85, built in 383.32 ms
-  stages (ms): bounds 1.53, morton 0.09, sort 2.04, cluster 22.74, optimize 351.10, convert 5.82; mesh upload 15.58, tree download 38.98
-BVH (gpu_hploc): 1124015 nodes, 562008 leaves (avg 1.92 tris), depth 40, SAH cost 17.18, built in 329.20 ms
-  stages (ms): bounds 0.28, morton 0.09, sort 0.99, cluster 7.44, optimize 314.53, convert 5.87; mesh upload 14.28, tree download 32.18
-BVH (gpu_trbvh): 1072985 nodes, 536493 leaves (avg 2.02 tris), depth 42, SAH cost 16.26, built in 361.25 ms
-  stages (ms): bounds 0.29, morton 0.09, sort 1.40, hierarchy 0.24, fit 4.29, restructure 350.06, optimize 252.33, convert 4.88; mesh upload 12.89, tree download 32.40
+Mixed-size scene: 546647 vertices, 1081503 triangles (327 ms)
+BVH (gpu_lbvh): 1165889 nodes, 582945 leaves (avg 1.86 tris), depth 40, SAH cost 18.22, built in 171.24 ms
+  stages (ms): bounds 0.31, morton 0.09, sort 1.08, hierarchy 2.75, fit 1.29, optimize 162.19, convert 2.14; mesh upload 125.36, tree download 25.74
+BVH (gpu_ploc): 1123119 nodes, 561560 leaves (avg 1.93 tris), depth 40, SAH cost 16.85, built in 215.50 ms
+  stages (ms): bounds 0.29, morton 0.09, sort 1.01, cluster 12.85, optimize 197.96, convert 3.32; mesh upload 13.61, tree download 25.30
+BVH (gpu_hploc): 1124015 nodes, 562008 leaves (avg 1.92 tris), depth 40, SAH cost 17.18, built in 192.76 ms
+  stages (ms): bounds 0.29, morton 0.09, sort 0.99, cluster 4.69, optimize 183.51, convert 3.19; mesh upload 12.17, tree download 26.07
+BVH (gpu_trbvh): 1072985 nodes, 536493 leaves (avg 2.02 tris), depth 42, SAH cost 16.26, built in 207.34 ms
+  stages (ms): bounds 0.30, morton 0.11, sort 1.10, hierarchy 0.24, fit 1.36, restructure 201.97, optimize 143.62, convert 2.26; mesh upload 11.51, tree download 25.20
 Quality bench: 1920x1080, 16 AO, 4 builders x 1 modes, 11 runs (round-robin)
 
 builder      mode                  median ms     p25 ms     p75 ms
-gpu_lbvh     gpu_bvh_opt               34.26      33.88      35.95
-gpu_ploc     gpu_bvh_opt               29.54      29.13      32.80
-gpu_hploc    gpu_bvh_opt               31.77      31.00      32.99
-gpu_trbvh    gpu_bvh_opt               31.40      30.05      32.00
+gpu_lbvh     gpu_bvh_opt               20.28      19.72      20.31
+gpu_ploc     gpu_bvh_opt               18.42      18.17      18.72
+gpu_hploc    gpu_bvh_opt               18.10      17.86      18.38
+gpu_trbvh    gpu_bvh_opt               18.10      17.98      18.41
 
 wrote results\prbvh.csv and results\prbvh_render.csv
