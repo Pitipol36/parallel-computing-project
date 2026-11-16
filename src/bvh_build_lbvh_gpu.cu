@@ -291,8 +291,16 @@ bool GpuLbvhBuilder::build(const void* dVertsV, const void* dFacesV, int n, cons
                                         I.boxLo.as<float4>(), I.boxHi.as<float4>(), I.triCount.as<uint32_t>(),
                                         I.dfsCount.as<uint32_t>(), I.cost.as<float>());
     }
+    int root = 0;
+    PrbvhStats ps;
+    double optMs = 0;
+    if (params.prbvhIters > 0 && n > 2 &&
+        !prbvh_optimize_gpu(n, root, I.left.as<int>(), I.right.as<int>(), I.parent.as<int>(), I.boxLo.as<f4>(),
+                            I.boxHi.as<f4>(), I.triCount.as<uint32_t>(), I.dfsCount.as<uint32_t>(),
+                            I.cost.as<float>(), params, &ps, optMs, err))
+        return false;
     cudaEvent_t e5b = ev.mark();
-    DeviceTree tree{n, 0, I.left.as<int>(), I.right.as<int>(), I.parent.as<int>(), I.triCount.as<uint32_t>(),
+    DeviceTree tree{n, root, I.left.as<int>(), I.right.as<int>(), I.parent.as<int>(), I.triCount.as<uint32_t>(),
                     I.dfsCount.as<uint32_t>()};
     CU(convert_tree(tree, I.boxLo.as<float4>(), I.boxHi.as<float4>(), I.ms.order(), dVerts, dFaces,
                     I.nodes.as<BVHNode>(), I.tris.as<Tri>(), I.order.as<uint32_t>(), I.counters.as<int>()));
@@ -305,13 +313,17 @@ bool GpuLbvhBuilder::build(const void* dVertsV, const void* dFacesV, int n, cons
     rep.stages = {{"bounds", elapsed(e0, e1)}, {"morton", elapsed(e1, e2)}, {"sort", elapsed(e2, e3)},
                   {"hierarchy", elapsed(e3, e4)}, {"fit", elapsed(e4, e5)}};
     if (restructure) rep.stages.push_back({"restructure", elapsed(e5, e5b)});
+    if (params.prbvhIters > 0 && n > 2) rep.stages.push_back({"optimize", optMs});
     rep.stages.push_back({"convert", elapsed(e5b, e6)});
+    rep.optimizeMs = optMs;
+    rep.prbvhRounds = ps.iterations;
+    rep.prbvhMoves = ps.moves;
     rep.buildMs = elapsed(e0, e6);
 
     int counters[2] = {0, 0};
     uint32_t numNodes = 0;  // the root's collapsed count (root = node 0)
     CU(cudaMemcpy(counters, I.counters.p, 2 * sizeof(int), cudaMemcpyDeviceToHost));
-    CU(cudaMemcpy(&numNodes, I.dfsCount.p, 4, cudaMemcpyDeviceToHost));
+    CU(cudaMemcpy(&numNodes, I.dfsCount.as<uint32_t>() + root, 4, cudaMemcpyDeviceToHost));
     I.tree.nodes = I.nodes.p;
     I.tree.tris = I.tris.p;
     I.tree.triOrder = I.order.p;

@@ -197,7 +197,15 @@ bool ploc_build(PlocBuffers& B, const vec3* dVerts, const Face* dFaces, int n, c
         cur = 1 - cur;
     }
     cudaEvent_t e4 = ev.mark();
-    const int root = n > 1 ? n - 2 : 0;
+    int root = n > 1 ? n - 2 : 0;
+    PrbvhStats ps;
+    double optMs = 0;
+    if (params.prbvhIters > 0 && n > 2 &&
+        !prbvh_optimize_gpu(n, root, B.left.as<int>(), B.right.as<int>(), B.parent.as<int>(), B.nodeLo.as<f4>(),
+                            B.nodeHi.as<f4>(), B.triCount.as<uint32_t>(), B.dfsCount.as<uint32_t>(),
+                            B.cost.as<float>(), params, &ps, optMs, err))
+        return false;
+    cudaEvent_t e4b = ev.mark();
     DeviceTree dt{n, root, B.left.as<int>(), B.right.as<int>(), B.parent.as<int>(), B.triCount.as<uint32_t>(),
                   B.dfsCount.as<uint32_t>()};
     CU(convert_tree(dt, B.nodeLo.as<float4>(), B.nodeHi.as<float4>(), B.ms.order(), dVerts, dFaces,
@@ -207,9 +215,14 @@ bool ploc_build(PlocBuffers& B, const vec3* dVerts, const Face* dFaces, int n, c
     CU(cudaEventSynchronize(e5));
     const cudaEvent_t e1 = ev.ev[1], e2 = ev.ev[2], e3 = ev.ev[3];
     rep.stages = {{"bounds", elapsed(e0, e1)}, {"morton", elapsed(e1, e2)}, {"sort", elapsed(e2, e3)},
-                  {"cluster", elapsed(e3, e4)}, {"convert", elapsed(e4, e5)}};
+                  {"cluster", elapsed(e3, e4)}};
+    if (params.prbvhIters > 0 && n > 2) rep.stages.push_back({"optimize", elapsed(e4, e4b)});
+    rep.stages.push_back({"convert", elapsed(e4b, e5)});
     rep.buildMs = elapsed(e0, e5);
     rep.iterations = iterations;
+    rep.optimizeMs = optMs;
+    rep.prbvhRounds = ps.iterations;
+    rep.prbvhMoves = ps.moves;
 
     int counters[2] = {0, 0};
     uint32_t numNodes = 0;

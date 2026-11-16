@@ -98,6 +98,17 @@ BVH build_hploc_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* re
     }
     rep.stages.push_back({"cluster", ms_since(t)});
 
+    if (params.prbvhIters > 0 && n > 2) {  // PRBVH reinsertion before the collapse
+        t = Clock::now();
+        PrbvhStats ps;
+        root = prbvh_optimize_cpu(n, root, left.data(), right.data(), parent.data(), lo.data(), hi.data(),
+                                  triCount.data(), dfsCount.data(), cost.data(), params, &ps);
+        rep.optimizeMs = ms_since(t);
+        rep.prbvhRounds = ps.iterations;
+        rep.prbvhMoves = ps.moves;
+        rep.stages.push_back({"optimize", rep.optimizeMs});
+    }
+
     t = Clock::now();
     std::vector<AABB> nodeBox(total);
     for (int x = 0; x < total; ++x) nodeBox[x] = {xyz(lo[x]), xyz(hi[x])};

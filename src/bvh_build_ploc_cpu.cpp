@@ -89,10 +89,28 @@ BVH build_ploc_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* rep
     }
     rep.stages.push_back({"cluster", ms_since(t)});
 
+    int root = n > 1 ? n - 2 : 0;
+    if (params.prbvhIters > 0 && n > 2) {  // PRBVH reinsertion before the collapse
+        t = Clock::now();
+        std::vector<f4> lo(total), hi(total);
+        for (int x = 0; x < total; ++x) {
+            lo[x] = {nodeBox[x].bmin.x, nodeBox[x].bmin.y, nodeBox[x].bmin.z, 0.0f};
+            hi[x] = {nodeBox[x].bmax.x, nodeBox[x].bmax.y, nodeBox[x].bmax.z, 0.0f};
+        }
+        PrbvhStats ps;
+        root = prbvh_optimize_cpu(n, root, left.data(), right.data(), parent.data(), lo.data(), hi.data(),
+                                  triCount.data(), dfsCount.data(), cost.data(), params, &ps);
+        for (int x = 0; x < total; ++x) nodeBox[x] = {xyz(lo[x]), xyz(hi[x])};
+        rep.optimizeMs = ms_since(t);
+        rep.prbvhRounds = ps.iterations;
+        rep.prbvhMoves = ps.moves;
+        rep.stages.push_back({"optimize", rep.optimizeMs});
+    }
+
     t = Clock::now();
     BinaryTreeView view;
     view.n = n;
-    view.root = n > 1 ? n - 2 : 0;
+    view.root = root;
     view.left = left.data();
     view.right = right.data();
     view.parent = parent.data();

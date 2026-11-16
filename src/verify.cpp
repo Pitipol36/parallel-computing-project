@@ -507,6 +507,61 @@ void test_trbvh_builders() {
     }
 }
 
+void test_prbvh() {
+    std::string gdesc, err;
+    size_t fb, tb;
+    const bool gpu = gpu_info(gdesc, fb, tb);
+    struct Case { const char* name; Mesh mesh; int leaf, iters; };
+    std::vector<Case> cases;
+    cases.push_back({"icosphere(4)", make_icosphere(4), 4, 8});
+    cases.push_back({"test scene", make_test_scene(3), 2, 8});
+    cases.push_back({"icosphere(5), 2 rounds", make_icosphere(5), 8, 2});
+    Mesh tiny;
+    tiny.vertices = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {5, 0, 0}, {6, 0, 0}, {5, 1, 0}, {0, 0, 5}, {1, 0, 5}, {0, 1, 5}};
+    tiny.faces = {{0, 1, 2}, {3, 4, 5}, {6, 7, 8}};
+    cases.push_back({"three triangles", tiny, 1, 8});
+    Mesh dup = make_icosphere(2);
+    size_t nf = dup.faces.size();
+    for (size_t i = 0; i < nf; ++i) dup.faces.push_back(dup.faces[i]);
+    cases.push_back({"duplicated icosphere(2)", dup, 4, 8});
+    const std::pair<BuilderKind, BuilderKind> pairs[] = {{BuilderKind::CpuLbvh, BuilderKind::GpuLbvh},
+                                                         {BuilderKind::CpuPloc, BuilderKind::GpuPloc},
+                                                         {BuilderKind::CpuHploc, BuilderKind::GpuHploc},
+                                                         {BuilderKind::CpuTrbvh, BuilderKind::GpuTrbvh}};
+    for (Case& c : cases) {
+        for (auto [ck, gk] : pairs) {
+            BuildParams bp;
+            bp.maxLeaf = c.leaf;
+            BVH base, cpu;
+            BuildReport r0, r1;
+            build_with(ck, c.mesh, bp, base, r0, err);
+            bp.prbvhIters = c.iters;
+            build_with(ck, c.mesh, bp, cpu, r1, err);
+            const double s0 = tree_stats(base).sahCost, s1 = tree_stats(cpu).sahCost;
+            std::printf("  PRBVH on %s after %s (%zu tris): SAH %.2f -> %.2f, %d rounds, %d moves\n", c.name,
+                        builder_name(ck), c.mesh.faces.size(), s0, s1, r1.prbvhRounds, r1.prbvhMoves);
+            if (c.mesh.faces.size() > 10) {
+                check_bvh(c.mesh, cpu);
+            } else {
+                std::string rep;
+                check(validate_bvh(cpu, rep), "small PRBVH tree is valid");
+            }
+            check(s1 <= s0 * 1.0001, "PRBVH never makes the tree worse by SAH cost");
+            if (!gpu) continue;
+            BVH g;
+            BuildReport rg;
+            const bool built = build_with(gk, c.mesh, bp, g, rg, err);
+            if (!built) std::printf("    %s\n", err.c_str());
+            check(built, "GPU builder with PRBVH builds");
+            std::string why;
+            const bool same = built && same_bvh(cpu, g, why);
+            if (built && !same) std::printf("    %s\n", why.c_str());
+            check(same, "GPU PRBVH is node-for-node identical to the CPU twin");
+            check(rg.prbvhMoves == r1.prbvhMoves && rg.prbvhRounds == r1.prbvhRounds, "same PRBVH rounds and moves");
+        }
+    }
+}
+
 }  // namespace
 
 int run_unit_tests() {
@@ -527,6 +582,7 @@ int run_unit_tests() {
     test_ploc_builders();
     test_trbvh_builders();
     test_hploc_builders();
+    test_prbvh();
     std::printf("Unit tests: %d/%d checks passed -> %s\n", g_checks - g_failures, g_checks,
                 g_failures ? "FAIL" : "PASS");
     return g_failures;

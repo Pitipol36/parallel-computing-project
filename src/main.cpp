@@ -82,6 +82,9 @@ void usage() {
         "  --trbvh-thread      GPU TRBVH: one thread per treelet instead of one warp\n"
         "  --hploc-radius R    H-PLOC nearest-neighbour search radius in a cluster list (default 8)\n"
         "  --hploc-threshold T H-PLOC list size that triggers merging, 1..16 (default 16)\n"
+        "  --optimize none|prbvh  PRBVH reinsertion on the LBVH/PLOC/H-PLOC/TRBVH binary tree\n"
+        "                      before the collapse (default none; prbvh = 8 rounds)\n"
+        "  --prbvh-iters N     PRBVH rounds (0 = off)\n"
         "  --collapse sah|count  leaf collapse of the LBVH/PLOC trees: by SAH cost (default) or\n"
         "                      any subtree with at most --leaf triangles\n"
         "  --build-bench       time each --build builder (--warmup/--runs, median per stage),\n"
@@ -152,6 +155,13 @@ bool parse_args(int argc, char** argv, Options& o) {
         else if (a == "--trbvh-thread") o.bp.trbvhWarp = false;
         else if (a == "--hploc-radius") o.bp.hplocRadius = std::stoi(next());
         else if (a == "--hploc-threshold") o.bp.hplocThreshold = std::stoi(next());
+        else if (a == "--optimize") {
+            const std::string v = next();
+            if (v == "prbvh") { if (o.bp.prbvhIters <= 0) o.bp.prbvhIters = 8; }
+            else if (v == "none") o.bp.prbvhIters = 0;
+            else { std::fprintf(stderr, "--optimize expects none or prbvh\n"); return false; }
+        }
+        else if (a == "--prbvh-iters") o.bp.prbvhIters = std::max(0, std::stoi(next()));
         else if (a == "--yaw") o.rp.yawDeg = std::stof(next());
         else if (a == "--pitch") o.rp.pitchDeg = std::stof(next());
         else if (a == "--fov") o.rp.fovDeg = std::stof(next());
@@ -521,7 +531,7 @@ int run_build_bench(const Options& o) {
     if (!exists) {
         csv << "experiment,model,tris,builder,leaf,runs,build_ms,upload_ms,download_ms";
         for (const char* s : stageNames) csv << "," << s << "_ms";
-        csv << ",sah_cost,nodes,leaves,max_depth,avg_leaf,ploc_radius,iterations,trbvh_passes,trbvh_treelet,trbvh_warp,hploc_radius,hploc_threshold\n";
+        csv << ",sah_cost,nodes,leaves,max_depth,avg_leaf,ploc_radius,iterations,trbvh_passes,trbvh_treelet,trbvh_warp,hploc_radius,hploc_threshold,optimize_ms,prbvh_rounds,prbvh_moves\n";
     }
     std::printf("%-10s %10s %10s %10s %8s %8s %6s\n", "builder", "build ms", "upload ms", "SAH cost", "depth", "leaves",
                 "iters");
@@ -532,7 +542,8 @@ int run_build_bench(const Options& o) {
         std::vector<std::vector<double>> stage(NS);
         BVH bvh;
         bool ok = true;
-        int iterations = 0;
+        int iterations = 0, prbvhRounds = 0, prbvhMoves = 0;
+        std::vector<double> opt;
         for (int r = 0; r < o.warmup + o.runs && ok; ++r) {
             BuildReport rep;
             std::string err;
@@ -543,6 +554,9 @@ int run_build_bench(const Options& o) {
             upload.push_back(rep.uploadMs);
             download.push_back(rep.downloadMs);
             iterations = rep.iterations;
+            prbvhRounds = rep.prbvhRounds;
+            prbvhMoves = rep.prbvhMoves;
+            opt.push_back(rep.optimizeMs);
             for (auto& st : rep.stages)
                 for (int s = 0; s < NS; ++s)
                     if (st.first == stageNames[s]) stage[s].push_back(st.second);
@@ -572,7 +586,8 @@ int run_build_bench(const Options& o) {
             << (trbvh ? std::to_string(o.bp.trbvhTreelet) : "") << ","
             << (trbvh ? (o.bp.trbvhWarp ? "1" : "0") : "") << ","
             << (hploc ? std::to_string(o.bp.hplocRadius) : "") << ","
-            << (hploc ? std::to_string(o.bp.hplocThreshold) : "") << "\n";
+            << (hploc ? std::to_string(o.bp.hplocThreshold) : "") << "," << median(opt) << "," << prbvhRounds << ","
+            << prbvhMoves << "\n";
     }
     return failures ? 1 : 0;
 }

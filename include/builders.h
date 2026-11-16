@@ -30,6 +30,9 @@ struct BuildReport {
     double uploadMs = 0;    // GPU: mesh upload before the build
     double downloadMs = 0;  // GPU: copying the finished tree back to the host
     int iterations = 0;     // PLOC: clustering iterations
+    int prbvhRounds = 0;    // PRBVH: rounds kept
+    int prbvhMoves = 0;     // PRBVH: reinsertions applied
+    double optimizeMs = 0;  // PRBVH time (part of buildMs)
 };
 
 // A finished BVH resident on the GPU, in the render kernels' format.
@@ -128,6 +131,21 @@ private:
 BVH build_hploc_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);
 bool build_hploc_gpu(const Mesh& mesh, const BuildParams& params, BVH* hostOut, DeviceBvh* devOut,
                      BuildReport* report, std::string& err);
+
+// PRBVH (parallel reinsertion) on a binary tree with one triangle per leaf, before the collapse.
+// Arrays as in bvh_common.h (f4 boxes); returns the new root. cost/dfsCount are left ready for the
+// converter. CPU twin and GPU version make the same moves.
+struct PrbvhStats {
+    int iterations = 0, moves = 0;
+    bool rolledBack = false;
+    double costBefore = 0, costAfter = 0;  // plain SAH sums (unnormalised)
+};
+struct f4;
+int prbvh_optimize_cpu(int n, int root, int* left, int* right, int* parent, f4* lo, f4* hi, uint32_t* triCount,
+                       uint32_t* dfsCount, float* cost, const BuildParams& params, PrbvhStats* stats);
+bool prbvh_optimize_gpu(int n, int& root, int* left, int* right, int* parent, f4* lo, f4* hi, uint32_t* triCount,
+                        uint32_t* dfsCount, float* cost, const BuildParams& params, PrbvhStats* stats, double& ms,
+                        std::string& err);
 
 // Full-sweep SAH reference builder (CPU, O(n log^2 n)).
 BVH build_sah_full_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);

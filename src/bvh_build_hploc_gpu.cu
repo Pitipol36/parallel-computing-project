@@ -211,12 +211,20 @@ bool GpuHplocBuilder::build(const void* dVertsV, const void* dFacesV, int n, con
     CU(cudaGetLastError());
     int host[4] = {0, 0, 0, 0};
     CU(cudaMemcpy(host, counters, 4 * sizeof(int), cudaMemcpyDeviceToHost));  // root id for the converter
-    const int root = n > 1 ? host[3] : 0;
+    int root = n > 1 ? host[3] : 0;
     if (n > 1 && host[2] != n - 1) {
         err = "H-PLOC created " + std::to_string(host[2]) + " nodes, expected n-1";
         return false;
     }
     cudaEvent_t e5 = ev.mark();
+    PrbvhStats ps;
+    double optMs = 0;
+    if (params.prbvhIters > 0 && n > 2 &&
+        !prbvh_optimize_gpu(n, root, B.left.as<int>(), B.right.as<int>(), B.parent.as<int>(), B.lo.as<f4>(),
+                            B.hi.as<f4>(), B.triCount.as<uint32_t>(), B.dfsCount.as<uint32_t>(), B.cost.as<float>(),
+                            params, &ps, optMs, err))
+        return false;
+    cudaEvent_t e5b = ev.mark();
     DeviceTree dt{n, root, B.left.as<int>(), B.right.as<int>(), B.parent.as<int>(), B.triCount.as<uint32_t>(),
                   B.dfsCount.as<uint32_t>()};
     CU(convert_tree(dt, reinterpret_cast<const float4*>(B.lo.p), reinterpret_cast<const float4*>(B.hi.p),
@@ -227,8 +235,13 @@ bool GpuHplocBuilder::build(const void* dVertsV, const void* dFacesV, int n, con
     const cudaEvent_t e1 = ev.ev[1], e2 = ev.ev[2], e3 = ev.ev[3];
     BuildReport rep;
     rep.stages = {{"bounds", elapsed(e0, e1)}, {"morton", elapsed(e1, e2)}, {"sort", elapsed(e2, e3)},
-                  {"cluster", elapsed(e3, e4)}, {"convert", elapsed(e5, e6)}};
+                  {"cluster", elapsed(e3, e4)}};
+    if (params.prbvhIters > 0 && n > 2) rep.stages.push_back({"optimize", elapsed(e5, e5b)});
+    rep.stages.push_back({"convert", elapsed(e5b, e6)});
     rep.buildMs = elapsed(e0, e4) + elapsed(e5, e6);  // the root readback between them is not build work
+    rep.optimizeMs = optMs;
+    rep.prbvhRounds = ps.iterations;
+    rep.prbvhMoves = ps.moves;
 
     CU(cudaMemcpy(host, counters, 2 * sizeof(int), cudaMemcpyDeviceToHost));
     uint32_t numNodes = 0;
