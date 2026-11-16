@@ -192,11 +192,11 @@ Windows display watchdog (TDR, ~2 s).
 
 `raytracer --verify` runs:
 
-* **Unit tests** (170 checks): ray–triangle (hit, miss, exact edge/vertex, parallel, behind),
+* **Unit tests** (216 checks): ray–triangle (hit, miss, exact edge/vertex, parallel, behind),
   ray–AABB (zero direction components, `tMax` culling, origin inside, misses), BVH closest-hit and
   any-hit against brute force on 4000 random rays for three meshes and build settings, ASCII and
   binary PLY round trips, RNG determinism and cosine distribution, and the LBVH tests listed under
-  [GPU BVH construction](#gpu-bvh-construction-lbvh-ploc-trbvh).
+  [GPU BVH construction](#gpu-bvh-construction-lbvh-ploc-h-ploc-trbvh).
 * **BVH validation**: every triangle appears in exactly one leaf, every node is reachable once,
   child boxes lie inside their parent, leaves contain their triangles, and depth fits the stack.
 * **Hit-ID test**: the primary-ray triangle ID per pixel must match the CPU in ≥ 99.99 % of pixels.
@@ -265,12 +265,18 @@ coherent paths.
 * The BVH build on the CPU (0.8–0.9 s) takes **longer than the GPU render plus transfer** for
   the big models (see `time_breakdown.png`). That makes a GPU BVH build the obvious next step.
 
-## GPU BVH construction (LBVH, PLOC, TRBVH)
+## GPU BVH construction (LBVH, PLOC, H-PLOC, TRBVH)
 
-Follow-up to the presentation (`gpu-bvh-build-plan.md`). Goal 1: build the BVH on the GPU with
-Karras's LBVH, measure the speedup, and state what it costs in tree quality. Goal 2: win that
-quality back with higher-quality parallel builders, PLOC and TRBVH, and show where each sits on
-the build-speed vs tree-quality curve.
+Follow-up to the presentation, in three steps:
+- **`gpu-bvh-build-plan.md`, Goal 1:** build the BVH on the GPU with Karras's LBVH and state what
+  it costs in tree quality.
+- **Goal 2:** win the quality back with PLOC and TRBVH.
+- **`bvh-builders-next-plan.md`:**
+  - **Phase 0:** measurements that can resolve 5–20 % differences.
+  - **Phase 1:** H-PLOC, PLOC-quality trees in a single kernel launch.
+
+  PRBVH (Phase 2) and the PLOC++ stepping stone were not done (see
+  [Limitations](#limitations-and-future-work)).
 
 **Why.** With the CPU SAH build, the build is most of the time to the first image
 (1080p, 4 AO, `gpu_bvh_opt`, end to end):
@@ -281,18 +287,21 @@ the build-speed vs tree-quality curve.
 | dragon | 771 ms | 25.6 ms | 97 % |
 | buddha | 941 ms | 28.6 ms | 97 % |
 
-The best builder minimises build + render. Few rays per build (previews, dynamic scenes, low
-sample counts) favour a fast builder; many rays per build favour a high-quality one. Scenes
-with incoherent motion (explosions, particles, destruction) need a full rebuild every frame,
-because refitting a fixed topology collapses in quality (measured below).
+The best builder minimises build + render:
+- **Few rays per build** (previews, dynamic scenes, low sample counts) favour a fast builder.
+- **Many rays per build** favour a high-quality one.
+- **Incoherent motion** (explosions, particles, destruction) needs a full rebuild every frame,
+  because refitting a fixed topology collapses in quality (measured below).
 
 ### Builders (`--build`)
 
 | Builder | What it is |
 |---|---|
-| `cpu_sah` | the existing binned SAH builder: the quality reference (100 %) |
+| `cpu_sah` | the original binned SAH builder (16 bins): the CPU speed baseline |
+| `cpu_sah_full` | **full-sweep SAH**: sorts the centroids on every axis at every node and evaluates every split, then the shared SAH collapse. O(n log² n); the **tree-quality reference (100 %)** |
 | `cpu_lbvh` / `gpu_lbvh` | Karras 2012 LBVH; the GPU tree is **node-for-node identical** to the CPU one |
 | `cpu_ploc` / `gpu_ploc` | PLOC, Meister & Bittner 2018; identical CPU and GPU trees |
+| `cpu_hploc` / `gpu_hploc` | H-PLOC, Benthin et al. 2024: a **single kernel launch** on the GPU; identical flattened trees |
 | `cpu_trbvh` / `gpu_trbvh` | LBVH + TRBVH treelet restructuring, Karras & Aila 2013; identical CPU and GPU trees |
 
 The single-threaded `cpu_*` versions run the same algorithm and the same shared code, so each
@@ -308,15 +317,20 @@ builder" is the only variable in every experiment.
    duplicate keys. Reference code commonly uses 30-bit codes.
 3. **Sort**: `cub::DeviceRadixSort::SortPairs` on (code, triangle index). It is stable, so
    equal codes keep index order exactly as the CPU's `(code, index)` sort does.
-4. **Collapse + flatten** (after the builder-specific stages): every binary-tree builder
-   produces one triangle per leaf. Bottom-up, each node gets an SAH cost,
-   `min(C_trav·A + cost(left) + cost(right), C_isect·N·A if N ≤ 4)` with C_trav = 1.2 and
-   C_isect = 1.0, and becomes a leaf when that is cheaper (`--collapse count` instead collapses
-   every subtree with ≤ 4 triangles). Each kept node then finds its depth-first position by
-   walking to the root, adding 1 per level plus the left sibling's collapsed size whenever it
-   comes from a right child, so no global synchronisation is needed. Triangles find their
-   output slot the same way, so a subtree's triangles need not be contiguous in the builder's
-   order (PLOC's and TRBVH's are not).
+4. **Collapse + flatten** (after the builder-specific stages):
+   - **Input:** every binary-tree builder produces one triangle per leaf.
+   - **Leaf collapse:** bottom-up, each node gets an SAH cost,
+     `min(C_trav·A + cost(left) + cost(right), C_isect·N·A if N ≤ 4)` with C_trav = 1.2 and
+     C_isect = 1.0, and becomes a leaf when that is cheaper. `--collapse count` instead
+     collapses every subtree with ≤ 4 triangles.
+   - **Flatten:** each kept node finds its depth-first position by walking to the root, adding 1
+     per level plus the left sibling's collapsed size whenever it comes from a right child. No
+     global synchronisation is needed.
+   - **Triangles** find their output slot the same way, so a subtree's triangles need not be
+     contiguous in the builder's order. PLOC's, H-PLOC's and TRBVH's are not.
+
+   The output depends only on the topology and child order, never on internal node ids, which
+   is what makes the H-PLOC comparison below possible.
 
 **LBVH** (`src/bvh_build_lbvh_gpu.cu`):
 
@@ -343,14 +357,49 @@ Each iteration runs four data-parallel kernels over the current clusters:
 4. **Merge**: new internal nodes are written (box, children, triangle count, SAH cost), and
    survivors are scattered in order.
 
-The CPU reads back one 8-byte total per iteration (the next cluster count). Distances use
-round-to-nearest arithmetic with no contraction, and ties are broken by a total order on
-pairs, so the CPU and GPU agree bit for bit and the globally closest pair is always mutual
-(every iteration makes progress).
+The CPU reads back one 8-byte total per iteration (the next cluster count).
+
+**Determinism (PLOC and H-PLOC):** distances use round-to-nearest arithmetic with no
+contraction, and ties are broken by a strict total order on pairs: (distance, index gap, parity
+of the lower index, lower index, higher index). That has two consequences:
+- The CPU and GPU agree bit for bit, and the globally closest pair is always mutual, so every
+  iteration makes progress.
+- On exact ties (identical boxes) neighbours pair up as (0,1), (2,3), …, so merging stays
+  balanced. Without the gap and parity terms, 200 copies of one triangle built a chain 76 levels
+  deep, deeper than the traversal stack. The unit tests caught this.
+
+**H-PLOC** (`include/hploc.h`, `src/bvh_build_hploc_gpu.cu`): after the shared bounds,
+Morton and sort stages, **one kernel launch** builds the whole binary hierarchy:
+
+1. **Bottom-up range walk** (Apetrei 2014): one thread per leaf starts with the key range
+   [k, k] and repeatedly moves to the parent. The parent's split is the neighbouring boundary
+   with the longer common prefix (same δ and duplicate-key fallback as the LBVH). At the parent
+   the thread does `atomicExch` of its outer boundary into the parent's slot: the first thread
+   to arrive stops, the second gets the sibling's boundary and continues with the merged range.
+   No thread ever waits on another, so there is no deadlock risk.
+2. **Cluster lists**: every node carries the list of clusters (node ids) of its range, stored
+   at the start of the range. The two children's lists are concatenated; the left list is
+   already in place, so a thread whose combined list stays within the threshold just moves the
+   right list up itself.
+3. **Warp-level merge**: when a combined list exceeds the threshold (16, half a warp), the lanes
+   that hold such nodes are served one at a time by the whole warp (`__ballot_sync` +
+   `__shfl_sync`, the pattern of the warp TRBVH). The warp loads the ≤ 32 clusters into shared
+   memory, one per lane, and runs PLOC iterations until the list is back to the threshold (1 at
+   the root):
+   - nearest neighbour within ±radius list positions;
+   - mutual pairs merge, with new node ids from a global `atomicAdd`;
+   - order-preserving compaction with `__ballot_sync` + `__popc`.
+
+No per-iteration launches and no readbacks; the host reads the root id once. The CPU twin
+(`src/bvh_build_hploc_cpu.cpp`) runs the same walk one leaf at a time with the same shared
+code. Merge decisions depend only on a list's contents and order, so the topology is the same
+in any processing order. Only the atomic node ids differ, and they don't affect the converter,
+so the **flattened CPU and GPU trees are compared byte for byte**. That is the canonical
+comparison the plan asked for, without a separate renumbering pass.
 
 **TRBVH** (`include/trbvh.h`, passes in `src/bvh_build_lbvh_gpu.cu`): starting from the LBVH
-with one triangle per leaf, each pass repeats the bottom-up climb, and the second thread to
-reach a node whose subtree has at least γ triangles restructures the **treelet** rooted there
+with one triangle per leaf, each pass repeats the bottom-up climb. The second thread to reach a
+node whose subtree has at least γ triangles restructures the **treelet** rooted there
 (γ = 7, 14, 28 over the default 3 passes):
 
 1. **Grow** the treelet: start from the node's children and repeatedly expand the treelet leaf
@@ -360,35 +409,66 @@ reach a node whose subtree has at least γ triangles restructures the **treelet*
    evaluations per treelet.
 3. **Rewire** the treelet's internal nodes (the root keeps its id) to the optimal topology.
 
-On the GPU each treelet is processed by a **whole warp**, as in the paper: lanes that reach a
-treelet root are served one at a time (`__ballot_sync` + `__shfl_sync`), lane 0 grows the
-treelet, all 32 lanes fill the subset tables in shared memory and solve the subsets of each
-size in parallel, and lane 0 rewires. Lanes never leave the loop early, so the warp-wide
-operations always see all 32 lanes. A one-thread-per-treelet version is kept behind
-`--trbvh-thread` for comparison. A final re-fit recomputes the collapse decisions for the new
-topology.
+On the GPU each treelet is processed by a **whole warp**, as in the paper:
+- lanes that reach a treelet root are served one at a time;
+- lane 0 grows the treelet;
+- all 32 lanes fill the subset tables in shared memory and solve the subsets of each size in
+  parallel;
+- lane 0 rewires.
 
-The per-element logic (Morton, δ, the split, the PLOC distance and tie-break, the treelet steps,
-the collapse and the converter) is `__host__ __device__` code in `include/morton.h`,
-`include/ploc.h`, `include/trbvh.h` and `include/bvh_common.h`, shared by the CPU and GPU
-builders.
+A one-thread-per-treelet version is kept behind `--trbvh-thread` for comparison. A final re-fit
+recomputes the collapse decisions for the new topology.
+
+### Measurement method (Phase 0)
+
+GPU render times on this desktop vary a lot with background load: up to ±25 % between runs of
+the same setting, while the quality gaps are 5–20 %. Quality renders therefore use
+`--quality-bench`:
+
+* **All trees first:** every builder's tree is built before any timing.
+* **Warm-up:** the GPU renders for 3 s so its clocks settle.
+* **Interleaving:** timed renders run round-robin (run 1 of every builder, then run 2, …), so
+  slow drift affects every builder equally.
+* **Statistics:** median of **11** runs and its interquartile range (`p25_ms` and `p75_ms`,
+  appended to the render CSV).
+* **Workload:** renders use **16 AO samples**, so the kernels run for 12–40 ms.
+
+The clocks could not be locked: `nvidia-smi -lgc` needs administrator rights ("The current user
+does not have permission to change clocks"). Even with all of the above, a few cells of the
+final run have a 75th percentile 2–4× the median: something else competed for the GPU during
+parts of the run. So **quality claims below rest on the SAH cost and the traversal counters,
+which are deterministic**. Render times back them up through medians and the 1-thread CPU
+render, which is far steadier. Two more Phase 0 changes:
+- **Stronger reference:** a full-sweep SAH reference replaces binned SAH as 100 %.
+- **Harder scene:** a mixed-size scene joins the uniform scans. Sponza and San Miguel from
+  McGuire's archive would have needed a download, so the plan's procedural fallback is used
+  (`--model mixed`, camera `--cam inside`):
+  - 8 huge ground triangles;
+  - the dragon;
+  - the bunny at 0.08×, 0.6× and 1.6× the dragon's size;
+  - 140 thin pillar boxes of random height.
+
+  1.08 M triangles of very different sizes in total. The previous run's CSVs are kept in
+  `results/v1/`.
 
 ### Running it
 
 ```bash
 # Build-time benchmark: median per stage + tree quality, appended to results/build.csv
-build/raytracer --model data/dragon_vrip.ply --build-bench --build cpu_sah,gpu_lbvh,gpu_ploc,gpu_trbvh --validate
+build/raytracer --model data/dragon_vrip.ply --build-bench --build cpu_sah_full,gpu_lbvh,gpu_ploc,gpu_hploc,gpu_trbvh --validate
 
-# Render with a GPU-built tree; PLOC with another radius; TRBVH with fewer passes
-build/raytracer --model data/dragon_vrip.ply --build gpu_ploc --ploc-radius 16 --mode gpu_bvh_opt
-build/raytracer --model data/dragon_vrip.ply --build gpu_trbvh --trbvh-passes 1 --mode gpu_bvh_opt
+# Interleaved render timing of several trees, median + IQR
+build/raytracer --model data/dragon_vrip.ply --quality-bench --build cpu_sah,gpu_hploc,gpu_trbvh --mode gpu_bvh_opt --ao 16 --runs 11 --csv results/mine.csv
 
-# Exploding dragon: CPU SAH, GPU LBVH, PLOC and TRBVH rebuilds and a refit, every frame
+# The mixed-size scene from inside; H-PLOC with other parameters
+build/raytracer --model mixed --cam inside --build gpu_hploc --hploc-radius 4 --hploc-threshold 8 --mode gpu_bvh_opt
+
+# Exploding dragon: CPU SAH, GPU LBVH, PLOC, H-PLOC and TRBVH rebuilds and a refit, every frame
 build/raytracer --model data/dragon_vrip.ply --dynamic --frames 60 --width 1280 --height 720 --out renders/explode.png
 
 # Box/triangle tests per ray need the counting build (never use it for timing)
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -Stats
-build-stats/raytracer --model data/dragon_vrip.ply --build gpu_trbvh --mode gpu_bvh_opt
+build-stats/raytracer --model data/dragon_vrip.ply --build gpu_hploc --mode gpu_bvh_opt
 
 # Everything, then the charts
 powershell -ExecutionPolicy Bypass -File scripts\run_build_benchmarks.ps1
@@ -397,115 +477,157 @@ py scripts\plot_build.py
 
 ### Correctness
 
-* **Unit tests** (170 checks in total): Morton expansion and bit order; δ with duplicate keys;
-  hand-checked hierarchies for n = 2, 3 and 4 identical keys; the Karras tree against an
-  independent top-down reference for 60 random sorted key sets with many duplicates
-  (n = 2 … 2,233); the PLOC tie-break and distance; every builder against brute force on random
-  rays; PLOC and TRBVH never worse than LBVH by SAH cost; every GPU builder node-for-node equal to
-  its CPU twin on five meshes (including a single triangle, three triangles and a mesh with every
-  triangle duplicated); PLOC's CPU and GPU iteration counts equal.
-* **`--verify`** on the test scene, bunny and dragon: every tree passes structure validation,
-  each GPU tree equals its CPU twin byte for byte, rendering any tree gives exactly the same
-  per-pixel triangle IDs as the SAH tree (the closest hit does not depend on the BVH), and the
-  device-resident render matches the host-copy render.
-* **`compute-sanitizer`** `memcheck`, `racecheck`, `synccheck` and `initcheck` on all three GPU
-  builders: 0 errors, 0 hazards (including the warp-shared TRBVH tables).
+* **Unit tests** (216 checks in total):
+  - Morton expansion and bit order; δ with duplicate keys;
+  - hand-checked hierarchies for n = 2, 3 and 4 identical keys, and the Karras tree against an
+    independent top-down reference for 60 random sorted key sets with many duplicates
+    (n = 2 … 2,233);
+  - the PLOC tie-break and distance, and H-PLOC's bottom-up parent choice;
+  - every builder against brute force on random rays;
+  - every GPU builder equal to its CPU twin on 5–9 meshes each, including n = 1, 2, 3, 200
+    identical triangles, H-PLOC threshold 1, and a mesh with every triangle duplicated.
+* **`--verify`** on the test scene, bunny and dragon:
+  - every tree passes structure validation;
+  - each GPU tree equals its CPU twin byte for byte;
+  - rendering any tree gives exactly the same per-pixel triangle IDs as the SAH tree (the
+    closest hit does not depend on the BVH);
+  - the device-resident render matches the host-copy render.
+* **`compute-sanitizer`** `memcheck`, `racecheck`, `synccheck` and `initcheck` on all four GPU
+  builders: 0 errors, 0 hazards, including the warp-shared TRBVH tables and the H-PLOC cluster
+  lists.
 
 ### Results
 
-Median of 5 builds after a warm-up (`results/build.csv`; PLOC r = 8; TRBVH 3 passes, 7-leaf
-treelets, warp-cooperative). GPU times are `cudaEvent` time of the build kernels; the mesh upload
-(1.4–15 ms) is extra.
+**Build time**: median of 5 builds after a warm-up (`results/build.csv`; PLOC r = 8; H-PLOC
+r = 8, threshold 16; TRBVH 3 passes, 7-leaf treelets, warp-cooperative). GPU times are
+`cudaEvent` time of the build kernels; the mesh upload (1.5–14 ms) is extra.
 
-| Model | CPU SAH | GPU LBVH | GPU PLOC | GPU TRBVH | CPU LBVH | CPU PLOC | CPU TRBVH |
-|---|---|---|---|---|---|---|---|
-| bunny (69K) | 53.3 ms | 0.51 ms | 3.3 ms | 7.6 ms | 21.3 ms | 40.3 ms | 178 ms |
-| dragon (871K) | 714 ms | 4.8 ms | 13.0 ms | 46.2 ms | 304 ms | 672 ms | 2,316 ms |
-| buddha (1.09M) | 873 ms | 6.0 ms | 13.9 ms | 58.7 ms | 384 ms | 861 ms | 2,912 ms |
+| Model | CPU SAH (binned) | CPU full SAH | GPU LBVH | GPU PLOC | GPU H-PLOC | GPU TRBVH |
+|---|---|---|---|---|---|---|
+| bunny (69K) | 63.5 ms | 205 ms | 0.51 ms | 3.45 ms | **0.91 ms** | 7.5 ms |
+| dragon (871K) | 758 ms | 3.73 s | 4.8 ms | 13.1 ms | **9.2 ms** | 46.8 ms |
+| buddha (1.09M) | 955 ms | 4.65 s | 6.0 ms | 15.2 ms | **11.5 ms** | 58.3 ms |
+| mixed (1.08M) | 1,116 ms | 5.67 s | 6.1 ms | 15.5 ms | **11.3 ms** | 58.1 ms |
 
-On the big models the GPU builders are **~150× (LBVH), 55–63× (PLOC) and ~15× (TRBVH) faster
-than the CPU SAH builder**, and 50–64× faster than their own single-threaded versions.
+On the big models the GPU builders are 160–180× (LBVH), 58–72× (PLOC), 80–100× (H-PLOC) and
+16–19× (TRBVH) faster than the binned CPU SAH build, and 52–75× faster than their own
+single-threaded versions (CPU H-PLOC: 45 / 669 / 801 / 847 ms).
 
 ![Build time](results/plots/build_time_vs_size.png)
 
-**Quality** (`build_quality.png`; counters from the `-Stats` build at 1080p, 4 AO):
+**Quality**: SAH cost relative to the full-sweep SAH reference (`build_quality.png`; counters
+from the `-Stats` build at 1080p, 16 AO):
 
-| Model | SAH cost: LBVH / PLOC / TRBVH (% of SAH) | Box tests / ray: SAH, LBVH, PLOC, TRBVH | Triangle tests / ray: SAH, LBVH, PLOC, TRBVH | 1-thread CPU render: SAH, LBVH, PLOC, TRBVH |
-|---|---|---|---|---|
-| bunny | 118 / 111 / 104 % | 24.5, 27.8, 28.8, 25.5 | 1.85, 2.00, 1.97, 1.97 | 695, 765, 786, 719 ms |
-| dragon | 122 / 111 / 105 % | 30.9, 36.9, 34.9, 32.2 | 2.21, 2.38, 2.29, 2.35 | 918, 1,045, 1,026, 962 ms |
-| buddha | 128 / 110 / 105 % | 30.5, 37.2, 34.0, 32.0 | 2.21, 2.38, 2.27, 2.34 | 882, 1,048, 985, 938 ms |
+| Model | binned SAH | LBVH | PLOC | H-PLOC | TRBVH | box tests / ray: full SAH, LBVH, PLOC, H-PLOC, TRBVH |
+|---|---|---|---|---|---|---|
+| bunny | 100.9 % | 118.9 % | 112.4 % | 111.2 % | 105.3 % | 34.3, 39.4, 40.1, 39.8, 36.1 |
+| dragon | 101.3 % | 123.4 % | 112.1 % | 111.2 % | 106.6 % | 44.5, 54.2, 51.5, 50.4, 47.2 |
+| buddha | 101.2 % | 129.9 % | 112.4 % | 112.7 % | 106.4 % | 44.7, 56.1, 52.0, 52.4, 47.6 |
+| mixed | **111.1 %** | 182.3 % | 118.7 % | 121.8 % | **103.3 %** | 24.6, 45.3, 29.8, 29.5, 27.8 |
 
-* The quality order LBVH < PLOC < TRBVH < SAH matches both papers, and the SAH cost predicts the
-  measured work: box tests per ray fall from +20 % (LBVH) to +12 % (PLOC) to +4–5 % (TRBVH) over
-  the SAH tree on the big models.
-* The 1-thread CPU render is the steadiest measure of tree quality (GPU kernel times in these
-  runs vary by ±25 % with background load). On the dragon the LBVH tree renders 14 % slower than
-  the SAH tree, PLOC 12 % and TRBVH 5 %; on the Buddha 19 %, 12 % and 6 %.
-* On the procedural test scene (`--verify`) PLOC's tree is 11 % and TRBVH's 14 % *cheaper* than
-  the binned SAH builder's: binning is itself only an approximation of full SAH.
-* The SAH-based leaf collapse matters: the earlier ≤ 4-triangle rule gave the LBVH 3.45
-  triangle tests per ray on the dragon; the SAH rule gives 2.38.
+1-thread CPU render at 1080p, 16 AO (steadiest timing; medians, ms):
+
+| Model | full SAH | binned SAH | LBVH | PLOC | H-PLOC | TRBVH |
+|---|---|---|---|---|---|---|
+| dragon | 2,697 | 2,660 | 3,117 | 2,917 | 2,946 | 2,825 |
+| buddha | 2,504 | 2,484 | 3,106 | 2,955 | 2,980 | 2,670 |
+| mixed | 4,839 | 4,875 | 7,360 | 5,826 | 5,582 | 5,550 |
+
+* **The full-sweep reference** is only ~1 % better than binned SAH on the uniform scans, but
+  **11 % better on the mixed scene**: binning hurts when triangle sizes vary.
+* **TRBVH beats the binned CPU SAH builder on the mixed scene** (103 % vs 111 % of full SAH;
+  27.8 vs 24.6 box tests per ray) while building 19× faster.
+* The mixed scene separates the builders far more than the scans do. The LBVH is at 182 %: its
+  box tests per ray nearly double, and it renders 52 % slower than the reference.
+* **The quality order LBVH < PLOC ≈ H-PLOC < TRBVH < SAH holds on every model**, and the SAH cost
+  predicts the box tests per ray and the CPU render times.
+* On the procedural test scene (`--verify`), PLOC and H-PLOC are 11 % and TRBVH 14 % cheaper than
+  binned SAH.
+* The GPU render medians (`gpu_bvh_opt`, with IQR bars in the chart) follow the same order, but
+  some cells' IQRs are wide (see the method above). That is why the counters and CPU times are
+  the evidence here.
 
 ![Build speed vs quality](results/plots/pareto.png)
 
-**Where each builder sits** (`pareto.png`): every GPU builder is on the speed/quality front.
-GPU LBVH is the fastest at 118–128 % of SAH cost. GPU PLOC costs 2–3× the LBVH's time for
-110–111 %. GPU TRBVH costs another 3.5–4× for 104–105 %, still 15× faster than the CPU SAH build.
+**H-PLOC vs PLOC** (`pareto.png`, `hploc_sweep.png`):
+* **Faster everywhere:** 3.8× on the bunny and 1.3–1.4× on the big models (9.2 vs 13.1 ms on the
+  dragon). Its clustering is a single launch: 4.9 ms on the dragon, against PLOC's 9.2 ms over
+  68 iterations.
+* **Same quality on the scans:** 111–113 % vs 112 %. On the mixed scene it is 3 % worse
+  (122 % vs 119 %). Its merges only see clusters within one Morton subtree's list, so a big
+  triangle cannot find a partner outside it.
+* **So H-PLOC dominates PLOC** on the uniform scans and trades 3 % quality for 1.4× speed on the
+  mixed scene.
+* **Against the paper:** H-PLOC reports ≈ 15 % more total build time than LBVH. Here it takes
+  1.8–1.9× the LBVH's time, for two reasons:
+  - the warp-cooperative merging itself (4.9 ms vs LBVH's hierarchy + fit 1.4 ms);
+  - a slower flatten (3.0 vs 1.9 ms): atomically assigned node ids scatter the parent pointers
+    the converter walks.
 
-**Stages** (`build_stages.png`): GPU LBVH is dominated by the sort, the bottom-up fit and the
-collapse/flatten (1–2.4 ms each on the Buddha). GPU PLOC spends ~70 % of its time clustering
-(64 iterations on the Buddha; the per-iteration launches and the 8-byte readback add up once
-only a few thousand clusters remain). GPU TRBVH spends 92 % of its time restructuring.
+  The paper's implementation also fuses the collapse into the build; that would remove the
+  second cost.
+* **Radius × threshold** (dragon): every setting is within 111–113 % of the reference, and
+  r = 4 with threshold 16 is the fastest (6.2 ms). The defaults r = 8, threshold 16 give the
+  best quality (111.2 %).
 
-**PLOC radius** (`ploc_radius.png`, dragon): r = 1 gives 117 % of SAH in 8.4 ms; r = 2–16 gives
-110–112 % in 9.7–12.6 ms; larger radii only add build time (18 ms at r = 64) and quality stops
-improving. r = 8 (the default) is a good trade-off.
+**Stages** (`build_stages.png`):
+* GPU LBVH is dominated by the sort, the bottom-up fit and the collapse/flatten (1–2.4 ms each
+  on the Buddha).
+* GPU PLOC spends ~70 % of its time clustering (65 iterations on the Buddha).
+* GPU H-PLOC spends ~55 % in its one clustering launch and ~30 % in the flatten.
+* GPU TRBVH spends 92 % restructuring.
 
-**TRBVH passes and treelets** (`trbvh_passes.png`, dragon): the first pass does most of the work
-(122 % → 108 % of SAH, 25.5 ms); passes 2–4 bring it to 105.8, 105.3 and 105.1 % (38, 46, 52 ms).
-5-leaf treelets take 20 ms for 107 %. **Warp cooperation is 9.4× faster** than one thread per
-treelet (46 ms vs 439 ms, identical tree): the subset tables live in shared memory instead of
-local memory, and 32 lanes solve each subset size in parallel.
+**PLOC radius** (`ploc_radius.png`, dragon, % of full SAH): r = 1 gives 118.7 % in 8.5 ms; r = 4–16
+gives 112 % in 11–13 ms; larger radii only add build time (18.4 ms at r = 64).
 
-**Time to image** (`time_to_image.png`, dragon): build + transfers + render as a function of
-the rays traced with one tree, from a linear fit to the AO sweep (0–64 samples at 1080p). The
-SAH tree only beats the LBVH tree after **~6.8 G rays per build (~550 frames at 1080p, 4 AO)**
-and the TRBVH tree after **~23 G rays (~1,800 frames)**. Below that a GPU builder always gives
-the faster first image; between the GPU builders, the differences in render speed are close to
-the timing noise.
+**TRBVH passes** (`trbvh_passes.png`):
+* The first pass does most of the work: 123.4 % → 109.4 % in 26 ms.
+* Passes 2–4 reach 107.2, 106.6 and 106.5 %.
+* 5-leaf treelets: 20 ms for 108.6 %.
+* Warp cooperation is 10× faster than one thread per treelet (46.6 vs 470 ms) for the identical
+  tree.
+
+**Time to image** (`time_to_image.png`, dragon): build + transfers + render as a function of the
+rays traced with one tree, from a linear fit to the interleaved AO sweep (0–64 samples, 1080p).
+The binned SAH tree only beats the LBVH tree after **~5.2 G rays per build (~415 frames at 1080p,
+4 AO)**, the H-PLOC tree after ~9.5 G (~760 frames) and the TRBVH tree after ~20 G (~1,600
+frames).
 
 **Dynamic scene** (`dynamic_refit_vs_rebuild.png`, `explode.gif`): the dragon explodes over 60
-frames (1280×720, 4 AO); every triangle flies off in its own random direction.
+frames (1280×720, 4 AO); every triangle flies off in its own random direction. In this run the
+machine was busier than in the previous one: the CPU SAH rebuild took 1.45 s per frame vs 1.0 s
+before. Compare the rows with each other, not across runs.
 
-| Per frame (update + render) | Mean time | Frame rate | SAH cost, frame 0 → last |
+| Per frame (update + render) | Mean time | Mean update | SAH cost, frame 0 → last |
 |---|---|---|---|
-| CPU SAH rebuild + upload | 1,037 ms | 1.0 fps | 57 → 169 |
-| GPU LBVH rebuild | 17.7 ms | 57 fps | 70 → 180 |
-| GPU PLOC rebuild | 26.2 ms | 38 fps | 64 → 184 |
-| GPU TRBVH rebuild | 57.5 ms | 17 fps | 61 → 171 |
-| GPU refit of the frame-0 LBVH | 14.9 s | 0.07 fps | 70 → 80,663 |
+| CPU SAH rebuild + upload | 1,489 ms | 1,448 ms | 57 → 169 |
+| GPU LBVH rebuild | 29.8 ms | 7.6 ms | 70 → 180 |
+| GPU H-PLOC rebuild | 32.2 ms | 11.4 ms | 63 → 184 |
+| GPU PLOC rebuild | 38.4 ms | 17.8 ms | 64 → 184 |
+| GPU TRBVH rebuild | 82.6 ms | 64.2 ms | 61 → 171 |
+| GPU refit of the frame-0 LBVH | 24.4 s | 1.6 ms | 70 → 80,663 |
 
-Refitting is the cheapest update (1.1 ms), but under incoherent motion the old topology's boxes
-grow to span the whole explosion: the SAH cost rises over 1,000-fold and the last frame takes
-40 s to render. Rebuilding every frame on the GPU keeps every tree close to SAH quality. Once
-the pieces are scattered, PLOC's advantage over the LBVH disappears (184 vs 180), while TRBVH
-stays within 1 % of the CPU SAH rebuild at 18× its frame rate. For this scene the LBVH's speed
-wins.
+Refitting is the cheapest update, but under incoherent motion the old topology's boxes grow to
+span the whole explosion: the SAH cost rises over 1,000-fold. Every GPU rebuild keeps the tree
+close to SAH quality. Once the pieces are scattered, PLOC's and H-PLOC's advantage over the LBVH
+disappears, while TRBVH stays within 1 % of the CPU SAH rebuild.
 
 **The trade-off:**
 
-* **GPU LBVH**: ~150× faster than the CPU SAH build; tree 18–28 % worse by SAH cost, rendering
-  up to ~19 % slower. Best for dynamic scenes and quick previews.
-* **GPU PLOC**: 55–63× faster than the CPU SAH build, 2–3× slower than the LBVH; halves the
-  quality loss (110–111 %). The best middle ground on static scans.
-* **GPU TRBVH**: ~15× faster than the CPU SAH build; within 4–5 % of SAH quality, renders 5–6 %
-  slower than the SAH tree. Best when a tree serves many rays and the build must still be fast.
-* The CPU SAH tree only pays for its 0.7–0.9 s build after several hundred to a few thousand
-  full-HD frames rendered with the same tree.
+* **GPU LBVH**: the fastest build by far; its tree is 19–30 % worse on the scans and 82 % worse on
+  mixed sizes. Best for dynamic scenes and quick previews.
+* **GPU H-PLOC**: 1.9× the LBVH's build time for PLOC quality (111–113 % on the scans); faster
+  than PLOC everywhere. The best middle ground on uniform meshes.
+* **GPU PLOC**: slightly better than H-PLOC on mixed sizes (119 % vs 122 %), but 1.4× slower to
+  build.
+* **GPU TRBVH**: 5–7 % above the full-sweep reference on the scans and **better than the binned
+  CPU SAH builder on mixed sizes**, at ~16× the CPU SAH build's speed. Best when a tree serves
+  many rays.
+* The binned CPU SAH tree only pays for its 0.75–1.1 s build after several hundred to a few
+  thousand full-HD frames with the same tree.
 
 Lucy (28M triangles) was not available (only on the Stanford server, unreachable from here), so
-the Buddha is the largest model.
+the Buddha is the largest scanned model.
 
 ### References
 
@@ -517,8 +639,14 @@ the Buddha is the largest model.
   HPG 2013.
 * D. Meister, J. Bittner. *Parallel Locally-Ordered Clustering for Bounding Volume Hierarchy
   Construction.* IEEE TVCG 2018.
-* ToruNiina/lbvh (MIT), an LBVH implementation named in the plan as a read-only reference. The
-  kernels here were written from the papers; no code was taken from it.
+* C. Benthin, D. Meister, J. Barczak, R. Mehalwal, J. Tsakok, A. Kensler. *H-PLOC: Hierarchical
+  Parallel Locally-Ordered Clustering for Bounding Volume Hierarchy Construction.* Proc. ACM
+  CGIT 7(3), 2024.
+* C. Apetrei. *Fast and Simple Agglomerative LBVH Construction.* CGVC 2014.
+* ToruNiina/lbvh (MIT), an LBVH implementation named in the plan as a read-only reference.
+
+The kernels here were written from the papers and the plan's summaries. No code was taken from
+any reference implementation, and none was consulted for H-PLOC.
 
 ## Repository layout
 
@@ -526,26 +654,40 @@ the Buddha is the largest model.
 include/   vecmath.h (shared math, named so it never shadows <math.h>), trace.h (shared
            traversal + shading + optional traversal counters), bvh.h, mesh.h, camera.h, rng.h,
            ply_loader.h, render.h, builders.h (builder API, tree stats), morton.h (Morton
-           codes, delta, Karras split), bvh_common.h (binary tree + converter), animate.h
-src/       main.cpp (CLI), ply_loader.cpp, bvh_build.cpp (CPU SAH), bvh_build_lbvh_cpu.cpp,
-           bvh_build_lbvh_gpu.cu (GPU LBVH + refit), bvh_convert_cpu.cpp, builders.cpp,
-           animate.cu, render_cpu.cpp, render_gpu.cu (all render kernels + launch code),
-           camera.cpp, verify.cpp, image.cpp, mesh.cpp
+           codes, delta, Karras split), bvh_common.h (binary tree, SAH collapse, converter),
+           ploc.h, hploc.h, trbvh.h (shared builder steps), animate.h
+src/       main.cpp (CLI), ply_loader.cpp, bvh_build.cpp (binned SAH), bvh_build_sah_full.cpp,
+           gpu_build_common.cu/.cuh (bounds, Morton, sort, scan, converter), LBVH:
+           bvh_build_lbvh_cpu.cpp / _gpu.cu (+ TRBVH, refit), PLOC: bvh_build_ploc_cpu.cpp /
+           _gpu.cu, H-PLOC: bvh_build_hploc_cpu.cpp / _gpu.cu, bvh_convert_cpu.cpp,
+           builders.cpp, animate.cu, render_cpu.cpp, render_gpu.cu (all render kernels + launch
+           code), camera.cpp, verify.cpp, image.cpp, mesh.cpp (+ procedural scenes)
 tests/     unit-test runner (procedural meshes only)
 scripts/   build.ps1 [-Stats], download_data.ps1/.sh, run_benchmarks.ps1/.sh, plot_results.py,
            run_build_benchmarks.ps1, plot_build.py
-results/   results.csv, build.csv, build_render.csv, traversal.csv, dynamic.csv and plots/
+results/   results.csv, build.csv, build_render.csv, traversal.csv, dynamic.csv, v1/ (the
+           previous run) and plots/
 renders/   output images
 ```
 
 ## Limitations and future work
 
-* ~~The BVH is built on the CPU~~: done with three GPU builders, see
-  [GPU BVH construction](#gpu-bvh-construction-lbvh-ploc-trbvh).
+* ~~The BVH is built on the CPU~~: done with four GPU builders, see
+  [GPU BVH construction](#gpu-bvh-construction-lbvh-ploc-h-ploc-trbvh).
+* **Not done from the second plan:**
+  - **PRBVH** (parallel reinsertion, Phase 2): no time before the presentation. It is the
+    natural next step to push GPU trees to or past the full-sweep reference.
+  - **PLOC++** (optional Phase 1a).
+  - **A downloaded mixed-size scene** (Sponza / San Miguel): replaced by the procedural one.
+* GPU H-PLOC is 1.9× the LBVH's build time instead of the paper's ≈ 1.15×. Fusing the SAH collapse
+  into the build (as the paper does) and numbering nodes for locality would recover most of it.
 * GPU TRBVH could go faster: lane 0 still grows and rewires each treelet alone, and the large
-  subsets (6–7 leaves) are solved by one lane; splitting their partitions across lanes, as the
-  paper does, would cut the critical path further. GPU PLOC could stop reading back the cluster
-  count every iteration (e.g. run a fixed number of iterations between checks).
+  subsets (6–7 leaves) are solved by one lane. Splitting their partitions across lanes, as the
+  paper does, would cut the critical path further.
+* GPU PLOC could stop reading back the cluster count every iteration, for example by running a
+  fixed number of iterations between checks.
+* Render timings on this shared desktop GPU stay noisy even with warm-up, interleaving and
+  11 runs; locked clocks (administrator rights) or a dedicated machine would tighten them.
 * Sorting AO rays by direction or octant would make traversal within a warp more coherent.
 * Use Nsight Compute / `-DRT_PTXAS_VERBOSE=ON` to report register use, occupancy and local-memory
   traffic for the traversal stack.

@@ -20,7 +20,8 @@ OUT = os.path.join(RES, "plots")
 COLORS = {"cpu_sah": "#52514e", "cpu_lbvh": "#eb6834", "gpu_lbvh": "#2a78d6", "cpu_ploc": "#7a5bd6",
           "gpu_ploc": "#1baf7a", "cpu_trbvh": "#8a8984", "gpu_trbvh": "#d6457a", "gpu_refit": "#eda100",
           "cpu_sah_rebuild": "#52514e", "gpu_lbvh_rebuild": "#2a78d6", "gpu_ploc_rebuild": "#1baf7a",
-          "gpu_trbvh_rebuild": "#d6457a"}
+          "gpu_trbvh_rebuild": "#d6457a", "cpu_sah_full": "#10172a", "cpu_hploc": "#74c6cf",
+          "gpu_hploc": "#0e8a96", "gpu_hploc_rebuild": "#0e8a96"}
 STAGE_COLORS = {"bounds": "#1baf7a", "morton": "#eda100", "sort": "#eb6834", "hierarchy": "#2a78d6",
                 "fit": "#7a5bd6", "cluster": "#d6457a", "restructure": "#10172a", "convert": "#8a8984"}
 STAGES = ["bounds", "morton", "sort", "hierarchy", "fit", "cluster", "restructure", "convert"]
@@ -28,11 +29,28 @@ LABELS = {"cpu_sah": "CPU binned SAH", "cpu_lbvh": "CPU LBVH (1 thread)", "gpu_l
           "cpu_ploc": "CPU PLOC (1 thread)", "gpu_ploc": "GPU PLOC",
           "cpu_trbvh": "CPU TRBVH (1 thread)", "gpu_trbvh": "GPU TRBVH", "gpu_trbvh_rebuild": "GPU TRBVH rebuild",
           "cpu_sah_rebuild": "CPU SAH rebuild", "gpu_lbvh_rebuild": "GPU LBVH rebuild",
-          "gpu_ploc_rebuild": "GPU PLOC rebuild", "gpu_refit": "GPU refit (frame-0 topology)"}
-TREE_LABELS = {"cpu_sah": "SAH tree", "gpu_lbvh": "LBVH tree", "gpu_ploc": "PLOC tree", "gpu_trbvh": "TRBVH tree"}
-BUILDERS = ["cpu_sah", "cpu_lbvh", "cpu_ploc", "cpu_trbvh", "gpu_lbvh", "gpu_ploc", "gpu_trbvh"]
-MODEL_ORDER = ["bunny", "dragon", "buddha", "lucy"]
-MODEL_MARKERS = {"bunny": "o", "dragon": "s", "buddha": "D", "lucy": "^"}
+          "gpu_ploc_rebuild": "GPU PLOC rebuild", "gpu_refit": "GPU refit (frame-0 topology)",
+          "cpu_sah_full": "CPU full-sweep SAH", "cpu_hploc": "CPU H-PLOC (1 thread)", "gpu_hploc": "GPU H-PLOC",
+          "gpu_hploc_rebuild": "GPU H-PLOC rebuild"}
+TREE_LABELS = {"cpu_sah": "binned SAH", "cpu_sah_full": "full SAH", "gpu_lbvh": "LBVH", "gpu_ploc": "PLOC",
+               "gpu_hploc": "H-PLOC", "gpu_trbvh": "TRBVH"}
+BUILDERS = ["cpu_sah", "cpu_sah_full", "cpu_lbvh", "cpu_ploc", "cpu_hploc", "cpu_trbvh", "gpu_lbvh", "gpu_ploc",
+            "gpu_hploc", "gpu_trbvh"]
+MODEL_ORDER = ["bunny", "dragon", "buddha", "lucy", "mixed"]
+MODEL_MARKERS = {"bunny": "o", "dragon": "s", "buddha": "D", "lucy": "^", "mixed": "P"}
+REF = "cpu_sah_full"  # 100 % in every quality chart (falls back to cpu_sah when missing)
+
+
+def ref_costs(build):
+    """SAH cost of the reference tree per model, from the size experiment."""
+    size = [r for r in build if r["experiment"] == "size"]
+    out = {r["model"]: r["sah_cost"] for r in size if r["builder"] == "cpu_sah"}
+    out.update({r["model"]: r["sah_cost"] for r in size if r["builder"] == REF})
+    return out
+
+
+def ref_label(build):
+    return "full-sweep SAH" if any(r["builder"] == REF for r in build) else "binned SAH"
 TEXT, TEXT2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 
 plt.rcParams.update({
@@ -128,9 +146,9 @@ def stage_plot(build):
     if not rows:
         return
     models = models_in(rows)
-    panels = [b for b in ("gpu_lbvh", "gpu_ploc", "gpu_trbvh", "cpu_lbvh", "cpu_ploc", "cpu_trbvh")
-              if any(r["builder"] == b for r in rows)]
-    fig, axes = plt.subplots(2, 3, figsize=(15, 8), squeeze=False)
+    panels = [b for b in ("gpu_lbvh", "gpu_ploc", "gpu_hploc", "gpu_trbvh", "cpu_lbvh", "cpu_ploc", "cpu_hploc",
+                          "cpu_trbvh") if any(r["builder"] == b for r in rows)]
+    fig, axes = plt.subplots(2, 4, figsize=(20, 8), squeeze=False)
     for ax, b in zip(axes.flat, panels):
         by = {r["model"]: r for r in rows if r["builder"] == b}
         bottom = [0.0] * len(models)
@@ -162,19 +180,22 @@ def quality_plot(build, render, trav):
     if not rows:
         return
     models = models_in(rows)
-    trees = [b for b in ("cpu_sah", "gpu_lbvh", "gpu_ploc", "gpu_trbvh") if any(r["builder"] == b for r in rows)]
+    trees = [b for b in ("cpu_sah", "gpu_lbvh", "gpu_ploc", "gpu_hploc", "gpu_trbvh") if any(r["builder"] == b for r in rows)]
+    ref = ref_costs(build)
     by = {(r["model"], r["builder"]): r for r in rows}
     rend = {(r["model"], r["experiment"].replace("quality_", ""), r["mode"]): r for r in render
             if str(r["experiment"]).startswith("quality_")}
     tv = {(r["model"], r["builder"]): r for r in trav}
-    panels = [("SAH cost (% of CPU SAH)", lambda m, b: 100 * by[(m, b)]["sah_cost"] / by[(m, "cpu_sah")]["sah_cost"]
-               if (m, b) in by and (m, "cpu_sah") in by else None)]
+    panels = [(f"SAH cost (% of {ref_label(build)})", lambda m, b: 100 * by[(m, b)]["sah_cost"] / ref[m]
+               if (m, b) in by and m in ref else None)]
     if tv:
         panels.append(("box tests per ray", lambda m, b: tv[(m, b)]["box_tests_per_ray"] if (m, b) in tv else None))
         panels.append(("triangle tests per ray", lambda m, b: tv[(m, b)]["tri_tests_per_ray"] if (m, b) in tv else None))
     if rend:
         panels.append(("gpu_bvh_opt kernel time (ms)",
                        lambda m, b: rend[(m, b, "gpu_bvh_opt")]["kernel_ms"] if (m, b, "gpu_bvh_opt") in rend else None))
+        panels.append(("1-thread CPU render (ms)",
+                       lambda m, b: rend[(m, b, "cpu")]["kernel_ms"] if (m, b, "cpu") in rend else None))
     fig, axes = plt.subplots(1, len(panels), figsize=(4.4 * len(panels), 4.4), squeeze=False)
     w = 0.8 / len(trees)
     for ax, (title, fn) in zip(axes[0], panels):
@@ -182,8 +203,15 @@ def quality_plot(build, render, trav):
             vals = [fn(m, b) for m in models]
             xs = [i + (j - (len(trees) - 1) / 2) * w for i in range(len(models))]
             keep = [(x, v) for x, v in zip(xs, vals) if v is not None]
+            err = None
+            if title.startswith("gpu_bvh_opt"):
+                lo_hi = [(rend[(m, b, "gpu_bvh_opt")].get("p25_ms"), rend[(m, b, "gpu_bvh_opt")].get("p75_ms"))
+                         for m, v in zip(models, vals) if v is not None]
+                if lo_hi and all(a is not None and c is not None for a, c in lo_hi):
+                    err = [[v - a for (a, _), (_, v) in zip(lo_hi, keep)], [c - v for (_, c), (_, v) in zip(lo_hi, keep)]]
             bars = ax.bar([k[0] for k in keep], [k[1] for k in keep], width=w, color=COLORS[b], label=TREE_LABELS[b],
-                          edgecolor=SURFACE, linewidth=1)
+                          edgecolor=SURFACE, linewidth=1, yerr=err, error_kw={"elinewidth": 1, "capsize": 2,
+                                                                               "ecolor": TEXT2})
             for bar, (_, v) in zip(bars, keep):
                 ax.annotate(f"{v:.0f}" if v >= 10 else f"{v:.2f}", (bar.get_x() + bar.get_width() / 2, v),
                             textcoords="offset points", xytext=(0, 3), ha="center", fontsize=7.5, color=TEXT2)
@@ -191,8 +219,9 @@ def quality_plot(build, render, trav):
         ax.set_xticklabels(models)
         ax.set_title(title, loc="left", fontsize=11)
         ax.margins(y=0.15)
-    axes[0][0].legend(loc="lower left", fontsize=8.5)
-    fig.suptitle("Tree quality by builder (1080p, 4 AO)", x=0.01, ha="left", fontweight="bold")
+    axes[0][0].legend(loc="upper left", fontsize=8.5)
+    fig.suptitle("Tree quality by builder (1080p, 16 AO; GPU times: median of 11 interleaved runs, bars = IQR)",
+                 x=0.01, ha="left", fontweight="bold")
     save(fig, "build_quality.png")
 
 
@@ -200,12 +229,12 @@ def quality_plot(build, render, trav):
 
 def radius_plot(build):
     rows = sorted([r for r in build if r["experiment"] == "radius"], key=lambda r: r["ploc_radius"])
-    sah = {r["model"]: r for r in build if r["experiment"] == "size" and r["builder"] == "cpu_sah"}
+    refc = ref_costs(build)
     lb = {r["model"]: r for r in build if r["experiment"] == "size" and r["builder"] == "gpu_lbvh"}
     if not rows:
         return
     model = rows[0]["model"]
-    ref = sah[model]["sah_cost"] if model in sah else None
+    ref = refc.get(model)
     xs = list(range(len(rows)))
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
     axes[0].plot(xs, [r["build_ms"] for r in rows], marker="o", color=COLORS["gpu_ploc"], label="GPU PLOC")
@@ -228,8 +257,8 @@ def radius_plot(build):
         if model in lb:
             axes[1].axhline(100 * lb[model]["sah_cost"] / ref, color=COLORS["gpu_lbvh"], linestyle="--",
                             linewidth=1.5, label="GPU LBVH")
-        axes[1].axhline(100, color=COLORS["cpu_sah"], linestyle=":", linewidth=1.5, label="CPU SAH = 100%")
-        axes[1].set_ylabel("SAH cost (% of CPU SAH)")
+        axes[1].axhline(100, color=COLORS["cpu_sah"], linestyle=":", linewidth=1.5, label=f"{ref_label(build)} = 100%")
+        axes[1].set_ylabel(f"SAH cost (% of {ref_label(build)})")
         axes[1].set_title("Tree quality", loc="left")
         axes[1].legend(loc="upper right", fontsize=9)
         axes[1].margins(y=0.25)
@@ -247,27 +276,27 @@ def pareto_plot(build):
     rows = [r for r in build if r["experiment"] == "size"]
     if not rows:
         return
-    sah = {r["model"]: r["sah_cost"] for r in rows if r["builder"] == "cpu_sah"}
-    fig, ax = plt.subplots(figsize=(8, 5))
-    for b in BUILDERS:
-        pts = [(r["build_ms"], 100 * r["sah_cost"] / sah[r["model"]], r["model"]) for r in rows
-               if r["builder"] == b and r["model"] in sah]
+    sah = ref_costs(build)
+    shown = ["cpu_sah", "cpu_sah_full", "gpu_lbvh", "gpu_ploc", "gpu_hploc", "gpu_trbvh"]
+    fig, ax = plt.subplots(figsize=(10, 5.4))
+    for b in shown:
+        pts = sorted([(r["build_ms"], 100 * r["sah_cost"] / sah[r["model"]], r["model"]) for r in rows
+                      if r["builder"] == b and r["model"] in sah], key=lambda p: MODEL_ORDER.index(p[2]))
+        if not pts:
+            continue
+        # One builder = one colour; its models are joined by a faint line so the cluster reads as one.
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=COLORS[b], linewidth=0.8, alpha=0.35, zorder=2)
         for i, (x, y, m) in enumerate(pts):
-            ax.scatter([x], [y], color=COLORS[b], marker=MODEL_MARKERS.get(m, "o"), s=60, zorder=3,
+            ax.scatter([x], [y], color=COLORS[b], marker=MODEL_MARKERS.get(m, "o"), s=64, zorder=3,
                        label=LABELS[b] if i == 0 else None, edgecolor=SURFACE, linewidth=0.8)
-        big = [p for p in pts if p[2] == "dragon"]
-        if big:
-            ax.annotate(LABELS[b], (big[0][0], big[0][1]), textcoords="offset points", xytext=(8, 6), fontsize=9,
-                        color=COLORS[b])
     for m, mk in MODEL_MARKERS.items():
         if m in sah:
             ax.scatter([], [], color=TEXT2, marker=mk, label=m)
     ax.set_xscale("log")
     ax.set_xlabel("build time (ms, log scale)")
-    ax.set_ylabel("SAH cost (% of CPU SAH)")
+    ax.set_ylabel(f"SAH cost (% of {ref_label(build)})")
     ax.set_title("Build speed vs tree quality (lower left is better)", loc="left")
-    ax.legend(loc="lower left", fontsize=8.5, ncol=2)
-    ax.set_ylim(bottom=ax.get_ylim()[0] - 12)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=9)
     save(fig, "pareto.png")
 
 
@@ -325,7 +354,7 @@ def time_to_image_plot(build, render):
     model = sweep[0]["model"]
     fits = {}
     fig, ax = plt.subplots(figsize=(8, 4.8))
-    for b in ("cpu_sah", "gpu_lbvh", "gpu_ploc", "gpu_trbvh"):
+    for b in ("cpu_sah", "gpu_lbvh", "gpu_ploc", "gpu_hploc", "gpu_trbvh"):
         pts = sorted(((r["width"] * r["height"] * (2 + r["ao"]), r) for r in sweep if r["experiment"] == f"rays_{b}"),
                      key=lambda p: p[0])
         if len(pts) < 2 or (model, b) not in size:
@@ -346,7 +375,7 @@ def time_to_image_plot(build, render):
         ax.plot(rays, [(fixed + a + c * r) / 1e3 for r in rays], color=COLORS[b], label=TREE_LABELS[b])
         ax.scatter(xs, [(fixed + y) / 1e3 for y in ys], color=COLORS[b], s=22, zorder=3)
     notes = []
-    for b1, b2 in (("gpu_lbvh", "cpu_sah"), ("gpu_trbvh", "cpu_sah")):
+    for b1, b2 in (("gpu_lbvh", "cpu_sah"), ("gpu_hploc", "cpu_sah"), ("gpu_trbvh", "cpu_sah")):
         if b1 in fits and b2 in fits:
             (f1, c1), (f2, c2) = fits[b1], fits[b2]
             if c1 > c2 and f2 > f1:
@@ -368,7 +397,7 @@ def time_to_image_plot(build, render):
 
 def trbvh_plot(build):
     rows = sorted([r for r in build if r["experiment"] == "trbvh_passes"], key=lambda r: r["trbvh_passes"])
-    sah = {r["model"]: r["sah_cost"] for r in build if r["experiment"] == "size" and r["builder"] == "cpu_sah"}
+    sah = ref_costs(build)
     if not rows or rows[0]["model"] not in sah:
         return
     model = rows[0]["model"]
@@ -398,8 +427,8 @@ def trbvh_plot(build):
     axes[0].set_yscale("log")
     axes[0].set_ylabel("build time (ms, log scale)")
     axes[0].set_title("Build time", loc="left")
-    axes[1].axhline(100, color=COLORS["cpu_sah"], linestyle=":", linewidth=1.5, label="CPU SAH = 100%")
-    axes[1].set_ylabel("SAH cost (% of CPU SAH)")
+    axes[1].axhline(100, color=COLORS["cpu_sah"], linestyle=":", linewidth=1.5, label=f"{ref_label(build)} = 100%")
+    axes[1].set_ylabel(f"SAH cost (% of {ref_label(build)})")
     axes[1].set_title("Tree quality", loc="left")
     axes[1].margins(y=0.2)
     axes[0].legend(loc="lower right", fontsize=8.5)
@@ -411,6 +440,41 @@ def trbvh_plot(build):
     save(fig, "trbvh_passes.png")
 
 
+def hploc_plot(build):
+    rows = [r for r in build if r["experiment"] == "hploc_sweep"]
+    refc = ref_costs(build)
+    if not rows or rows[0]["model"] not in refc:
+        return
+    model = rows[0]["model"]
+    ref = refc[model]
+    radii = sorted({int(r["hploc_radius"]) for r in rows})
+    ths = sorted({int(r["hploc_threshold"]) for r in rows})
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
+    shades = ["#74c6cf", "#0e8a96", "#0a5a63"]
+    for k, th in enumerate(ths):
+        pts = sorted([r for r in rows if int(r["hploc_threshold"]) == th], key=lambda r: r["hploc_radius"])
+        xs = [radii.index(int(r["hploc_radius"])) for r in pts]
+        axes[0].plot(xs, [r["build_ms"] for r in pts], marker="o", color=shades[k % 3], label=f"threshold {th}")
+        axes[1].plot(xs, [100 * r["sah_cost"] / ref for r in pts], marker="o", color=shades[k % 3],
+                     label=f"threshold {th}")
+        for x, r in zip(xs, pts):
+            axes[1].annotate(f"{100 * r['sah_cost'] / ref:.1f}%", (x, 100 * r["sah_cost"] / ref),
+                             textcoords="offset points", xytext=(0, 8), ha="center", fontsize=8.5, color=TEXT2)
+    axes[0].set_ylabel("build time (ms)")
+    axes[0].set_title("Build time", loc="left")
+    axes[0].set_ylim(bottom=0)
+    axes[1].set_ylabel(f"SAH cost (% of {ref_label(build)})")
+    axes[1].set_title("Tree quality", loc="left")
+    axes[1].margins(y=0.25)
+    for ax in axes:
+        ax.set_xticks(range(len(radii)))
+        ax.set_xticklabels([str(r) for r in radii])
+        ax.set_xlabel("H-PLOC search radius (list positions)")
+        ax.legend(loc="best", fontsize=9)
+    fig.suptitle(f"H-PLOC radius x threshold ({model})", x=0.01, ha="left", fontweight="bold")
+    save(fig, "hploc_sweep.png")
+
+
 def main():
     build, render = read("build.csv"), read("build_render.csv")
     trav, dyn = read("traversal.csv"), read("dynamic.csv")
@@ -419,6 +483,7 @@ def main():
     quality_plot(build, render, trav)
     radius_plot(build)
     trbvh_plot(build)
+    hploc_plot(build)
     pareto_plot(build)
     time_to_image_plot(build, render)
     dynamic_plots(dyn)
