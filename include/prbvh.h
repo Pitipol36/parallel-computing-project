@@ -15,7 +15,8 @@
 //      anywhere below a node b is at least the growth so far + A(X), which prunes most of the tree.
 //   2. lock: every move with a positive gain tries to claim the six nodes whose pointers it
 //      changes (X, P, S, P's parent, Y, Y's parent) with an atomic max of its priority key
-//      (gain, then smaller node id): a strict total order, so the winners do not depend on timing.
+//      (gain, then smaller in-order rank): a strict total order, so the winners do not depend on
+//      timing or on how the builder numbered the nodes.
 //   3. apply: a move that holds all six of its locks is applied; winners touch disjoint nodes.
 //   4. refit all boxes bottom-up, and undo the round if the total SAH cost went up (moves applied
 //      together can interact through shared ancestors' boxes).
@@ -44,6 +45,32 @@ struct PrbvhTree {
 };
 
 HD AABB prbvh_box(const PrbvhTree& t, int x) { return {xyz(ldcg_f4(t.lo + x)), xyz(ldcg_f4(t.hi + x))}; }
+
+// Read-only loads for the search, lock and winner kernels: nothing writes the tree while they
+// run, so they may go through L1 / the texture path (the refit must use the ldcg_* L2 loads).
+HD int ldro_i(const int* p) {
+#ifdef __CUDA_ARCH__
+    return __ldg(p);
+#else
+    return *p;
+#endif
+}
+HD uint32_t ldro_u(const uint32_t* p) {
+#ifdef __CUDA_ARCH__
+    return __ldg(reinterpret_cast<const unsigned int*>(p));
+#else
+    return *p;
+#endif
+}
+HD AABB prbvh_box_ro(const PrbvhTree& t, int x) {
+#ifdef __CUDA_ARCH__
+    const float4 a = __ldg(reinterpret_cast<const float4*>(t.lo + x));
+    const float4 b = __ldg(reinterpret_cast<const float4*>(t.hi + x));
+    return {{a.x, a.y, a.z}, {b.x, b.y, b.z}};
+#else
+    return {xyz(t.lo[x]), xyz(t.hi[x])};
+#endif
+}
 HD AABB box_union(const AABB& a, const AABB& b) { return {vmin(a.bmin, b.bmin), vmax(a.bmax, b.bmax)}; }
 HD float area_of(const AABB& b) { return box_area_rn(b.bmin, b.bmax); }
 
@@ -58,19 +85,19 @@ struct PrbvhMove {
 // GPU atomic counter vs its CPU twin) still break ties the same way. O(depth).
 HD uint32_t prbvh_rank(const PrbvhTree& t, int X) {
     uint32_t before = 0;  // leaves left of X's subtree
-    for (int c = X, p = ldcg_i(t.parent + X); p >= 0; c = p, p = ldcg_i(t.parent + p))
-        if (ldcg_i(t.right + p) == c) before += ldcg_u(t.triCount + ldcg_i(t.left + p));
-    return X < t.n - 1 ? 2u * (before + ldcg_u(t.triCount + ldcg_i(t.left + X))) - 1u : 2u * before;
+    for (int c = X, p = ldro_i(t.parent + X); p >= 0; c = p, p = ldro_i(t.parent + p))
+        if (ldro_i(t.right + p) == c) before += ldro_u(t.triCount + ldro_i(t.left + p));
+    return X < t.n - 1 ? 2u * (before + ldro_u(t.triCount + ldro_i(t.left + X))) - 1u : 2u * before;
 }
 
 HD PrbvhMove prbvh_search(const PrbvhTree& t, int X) {
     PrbvhMove best = {0.0f, -1};
-    const int P = ldcg_i(t.parent + X);
+    const int P = ldro_i(t.parent + X);
     if (P < 0) return best;
-    const int G = ldcg_i(t.parent + P);
+    const int G = ldro_i(t.parent + P);
     if (G < 0) return best;  // P is the root: removing X would make S the root (not handled)
-    const int S = ldcg_i(t.left + P) == X ? ldcg_i(t.right + P) : ldcg_i(t.left + P);
-    const AABB bx = prbvh_box(t, X);
+    const int S = ldro_i(t.left + P) == X ? ldro_i(t.right + P) : ldro_i(t.left + P);
+    const AABB bx = prbvh_box_ro(t, X);
     const float aX = area_of(bx);
 
     // Ancestor path a_0 = P, a_1 = G, ..., a_m = root, with each a_j's shrink when X is removed.
@@ -79,25 +106,25 @@ HD PrbvhMove prbvh_search(const PrbvhTree& t, int X) {
     int m = 0;
     chain[0] = P;
     shrink[0] = 0.0f;
-    AABB cur = prbvh_box(t, S);  // what now sits where P was
+    AABB cur = prbvh_box_ro(t, S);  // what now sits where P was
     while (true) {
         const int a = chain[m];
-        const int up = ldcg_i(t.parent + a);
+        const int up = ldro_i(t.parent + a);
         if (up < 0) break;
         if (m + 1 >= PRBVH_MAX_DEPTH) return best;
-        const int sib = ldcg_i(t.left + up) == a ? ldcg_i(t.right + up) : ldcg_i(t.left + up);
-        cur = box_union(cur, prbvh_box(t, sib));
+        const int sib = ldro_i(t.left + up) == a ? ldro_i(t.right + up) : ldro_i(t.left + up);
+        cur = box_union(cur, prbvh_box_ro(t, sib));
         ++m;
         chain[m] = up;
-        shrink[m] = fsub_rn(area_of(prbvh_box(t, up)), area_of(cur));
+        shrink[m] = fsub_rn(area_of(prbvh_box_ro(t, up)), area_of(cur));
     }
-    const float aP = area_of(prbvh_box(t, P));
+    const float aP = area_of(prbvh_box_ro(t, P));
 
     // (a) Move X up next to its ancestor a_i (i >= 1): N = (X, a_i'), whose box is a_i's old box.
     float removed = aP;  // A(P) + shrinks of a_1 .. a_i
     for (int i = 1; i <= m; ++i) {
         removed = fadd_rn(removed, shrink[i]);
-        const float g = fsub_rn(removed, area_of(prbvh_box(t, chain[i])));
+        const float g = fsub_rn(removed, area_of(prbvh_box_ro(t, chain[i])));
         if (g > best.gain || (g == best.gain && best.target >= 0 && prbvh_rank(t, chain[i]) < prbvh_rank(t, best.target))) {
             best.gain = g;
             best.target = chain[i];
@@ -114,13 +141,13 @@ HD PrbvhMove prbvh_search(const PrbvhTree& t, int X) {
         if (i == 0) {
             // LCA = P: S takes P's place; S itself is the original position, so start below it.
             if (S >= t.n - 1) continue;  // S is a leaf
-            const AABB bs = prbvh_box(t, S);
+            const AABB bs = prbvh_box_ro(t, S);
             const float growS = fsub_rn(area_of(box_union(bs, bx)), area_of(bs));
-            stackNode[sp] = ldcg_i(t.right + S); stackInd[sp++] = growS;
-            stackNode[sp] = ldcg_i(t.left + S); stackInd[sp++] = growS;
+            stackNode[sp] = ldro_i(t.right + S); stackInd[sp++] = growS;
+            stackNode[sp] = ldro_i(t.left + S); stackInd[sp++] = growS;
         } else {
             const int a = chain[i], below = chain[i - 1];
-            const int c = ldcg_i(t.left + a) == below ? ldcg_i(t.right + a) : ldcg_i(t.left + a);
+            const int c = ldro_i(t.left + a) == below ? ldro_i(t.right + a) : ldro_i(t.left + a);
             stackNode[sp] = c;
             stackInd[sp++] = 0.0f;
         }
@@ -128,7 +155,7 @@ HD PrbvhMove prbvh_search(const PrbvhTree& t, int X) {
             --sp;
             const int b = stackNode[sp];
             const float induced = stackInd[sp];
-            const AABB bb = prbvh_box(t, b);
+            const AABB bb = prbvh_box_ro(t, b);
             const float aBX = area_of(box_union(bb, bx));
             const float g = fsub_rn(rbelow, fadd_rn(induced, aBX));
             if (g > best.gain || (g == best.gain && best.target >= 0 && prbvh_rank(t, b) < prbvh_rank(t, best.target))) {
@@ -140,8 +167,8 @@ HD PrbvhMove prbvh_search(const PrbvhTree& t, int X) {
             // Any target below b costs at least ind2 + A(X): prune when that cannot beat best.
             if (fsub_rn(rbelow, fadd_rn(ind2, aX)) <= best.gain) continue;
             if (sp + 2 > PRBVH_STACK) continue;
-            stackNode[sp] = ldcg_i(t.right + b); stackInd[sp++] = ind2;
-            stackNode[sp] = ldcg_i(t.left + b); stackInd[sp++] = ind2;
+            stackNode[sp] = ldro_i(t.right + b); stackInd[sp++] = ind2;
+            stackNode[sp] = ldro_i(t.left + b); stackInd[sp++] = ind2;
         }
     }
     if (best.target < 0) best.gain = 0.0f;
@@ -155,13 +182,13 @@ HD uint64_t prbvh_key(float gain, uint32_t rank) {
 
 // The six nodes whose pointers the move (X -> next to Y) changes; -1 entries are ignored.
 HD void prbvh_move_nodes(const PrbvhTree& t, int X, int Y, int nodes[6]) {
-    const int P = t.parent[X];
+    const int P = ldro_i(t.parent + X);
     nodes[0] = X;
     nodes[1] = P;
-    nodes[2] = t.left[P] == X ? t.right[P] : t.left[P];  // S
-    nodes[3] = t.parent[P];                               // G
+    nodes[2] = ldro_i(t.left + P) == X ? ldro_i(t.right + P) : ldro_i(t.left + P);  // S
+    nodes[3] = ldro_i(t.parent + P);                                                // G
     nodes[4] = Y;
-    nodes[5] = t.parent[Y];                               // Q (-1 if Y is the root)
+    nodes[5] = ldro_i(t.parent + Y);                                                // Q (-1 if Y is the root)
 }
 
 // Applies the move (pointers only; boxes are refitted afterwards). Returns the new root if the
