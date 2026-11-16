@@ -1,21 +1,23 @@
 <section id="gpu-pareto" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
 <h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Build speed vs tree quality</h2>
 <div style="display:flex;gap:56px">
-<img src="/_blob/b029b19730fbb2e3473897398abc89bd" alt="Scatter chart, build time on a log axis against SAH cost as a percentage of the CPU SAH builder, for bunny, dragon and buddha: GPU LBVH 0.5 to 6 ms at 118 to 128 percent, GPU PLOC 3 to 14 ms at about 110 percent, GPU TRBVH 8 to 59 ms at about 105 percent, CPU SAH 53 to 873 ms at 100 percent; single-threaded CPU versions sit far to the right" style="width:880px;height:550px;object-fit:contain">
+<img src="/_blob/b387850f624d2ca5a1bac58df0140bd0" alt="Scatter chart, build time on a log axis against SAH cost as a percentage of the full-sweep SAH reference, for bunny, dragon, buddha and the mixed scene: GPU LBVH 0.5 to 6 ms at 119 to 182 percent, GPU H-PLOC 0.9 to 11.5 ms at 111 to 122 percent, GPU PLOC 3.5 to 15.5 ms at 112 to 119 percent, GPU TRBVH 7.5 to 58 ms at 103 to 107 percent, CPU binned SAH 63 to 1,116 ms at 101 to 111 percent, CPU full-sweep SAH 0.2 to 5.7 s at 100 percent" style="width:900px;height:486px;object-fit:contain">
 <div style="flex:1;display:flex;flex-direction:column;gap:28px">
 <table style="font-size:26px;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif">
 <tr><th style="width:34%">Buddha</th><th style="width:22%;text-align:right">Build</th><th style="width:22%;text-align:right">SAH cost</th><th style="width:22%;text-align:right">Render</th></tr>
-<tr><td>CPU SAH</td><td style="text-align:right">873 ms</td><td style="text-align:right">100 %</td><td style="text-align:right">882 ms</td></tr>
-<tr><td>GPU LBVH</td><td style="text-align:right">6.0 ms</td><td style="text-align:right">128 %</td><td style="text-align:right">+19 %</td></tr>
-<tr><td>GPU PLOC</td><td style="text-align:right">13.9 ms</td><td style="text-align:right">110 %</td><td style="text-align:right">+12 %</td></tr>
-<tr style="background:#EAF1FB"><td><b>GPU TRBVH</b></td><td style="text-align:right"><b>58.7 ms</b></td><td style="text-align:right"><b>105 %</b></td><td style="text-align:right"><b>+6 %</b></td></tr>
+<tr><td>CPU full SAH</td><td style="text-align:right">4.65 s</td><td style="text-align:right">100 %</td><td style="text-align:right">2,504 ms</td></tr>
+<tr><td>CPU binned SAH</td><td style="text-align:right">955 ms</td><td style="text-align:right">101 %</td><td style="text-align:right">−1 %</td></tr>
+<tr><td>GPU LBVH</td><td style="text-align:right">6.0 ms</td><td style="text-align:right">130 %</td><td style="text-align:right">+24 %</td></tr>
+<tr><td>GPU H-PLOC</td><td style="text-align:right">11.5 ms</td><td style="text-align:right">113 %</td><td style="text-align:right">+19 %</td></tr>
+<tr><td>GPU PLOC</td><td style="text-align:right">15.2 ms</td><td style="text-align:right">112 %</td><td style="text-align:right">+18 %</td></tr>
+<tr style="background:#EAF1FB"><td><b>GPU TRBVH</b></td><td style="text-align:right"><b>58.3 ms</b></td><td style="text-align:right"><b>106 %</b></td><td style="text-align:right"><b>+7 %</b></td></tr>
 </table>
 <div style="display:flex;flex-direction:column;gap:8px;background:#10172A;padding:32px;border-radius:16px">
 <p style="font-size:32px;font-weight:600;line-height:1.3;color:#F3F4F1">Pick by rays per build</p>
-<p style="font-size:24px;line-height:1.4;color:#C9D1E0">LBVH for previews and moving scenes, TRBVH when a tree serves many rays. The CPU SAH tree only pays off after ~550–1,800 full-HD frames.</p>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">LBVH for previews and moving scenes, H-PLOC as the middle ground, TRBVH when a tree serves many rays. The CPU SAH tree only pays off after ~400–1,600 full-HD frames.</p>
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">20 · Render = 1-thread CPU render time on each tree, 1080p, 4 AO. Quality order matches both papers: LBVH &lt; PLOC &lt; TRBVH &lt; SAH.</p>
-<aside>Here are all the builders on one chart: build time against tree quality, lower left is better. Every GPU builder sits on the front. The LBVH is the fastest by far but its tree is 18 to 28 percent worse. PLOC takes two to three times as long and halves that loss. TRBVH takes another three to four times as long and gets within 5 percent of the SAH builder, while still building fifteen times faster than it. The ordering matches what both papers report. On rendering, the TRBVH tree is only 6 percent slower than the SAH tree on the Buddha. So the choice depends on how many rays a tree will serve: the LBVH for previews and anything that moves, TRBVH when the tree will be used for many frames. The CPU SAH tree only pays for its build after hundreds to thousands of full-HD frames.</aside>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">22 · Render = 1-thread CPU render time on each tree, 1080p, 16 AO. Quality order on every model: LBVH &lt; PLOC ≈ H-PLOC &lt; TRBVH &lt; SAH.</p>
+<aside>Here are all the builders on one chart: build time against tree quality, lower left is better. Every GPU builder sits on the front. The LBVH is the fastest by far but its tree is 19 to 30 percent worse on the scans. H-PLOC takes about twice as long and roughly halves that loss, and it is faster than PLOC at the same quality. TRBVH takes another five times as long and gets within 6 percent of the full-sweep reference, while still building sixteen times faster than the CPU SAH builder. The ordering matches what the papers report. On rendering, the TRBVH tree is only 7 percent slower than the reference on the Buddha. So the choice depends on how many rays a tree will serve: the LBVH for previews and anything that moves, TRBVH when the tree will be used for many frames. The CPU SAH tree only pays for its build after hundreds to thousands of full-HD frames.</aside>
 </section>

@@ -2,8 +2,8 @@
 <h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Limitations and future work</h2>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
 <div style="display:flex;flex-direction:column;gap:12px;background:#FCFCFB;padding:40px;border-radius:16px">
-<h3 style="font-size:32px;font-weight:600;color:#10172A">Faster high-quality builds</h3>
-<p style="font-size:24px;line-height:1.45;color:#4A5263">TRBVH still grows and rewires each treelet on one lane; splitting the largest subsets across lanes would cut its 59 ms further.</p>
+<h3 style="font-size:32px;font-weight:600;color:#10172A">Beyond the CPU reference</h3>
+<p style="font-size:24px;line-height:1.45;color:#4A5263">Parallel reinsertion (PRBVH) on any GPU tree; fusing the collapse into H-PLOC; more lanes per TRBVH treelet.</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:12px;background:#FCFCFB;padding:40px;border-radius:16px">
 <h3 style="font-size:32px;font-weight:600;color:#10172A">Sort AO rays</h3>
@@ -18,6 +18,6 @@
 <p style="font-size:24px;line-height:1.45;color:#4A5263">Nsight Compute on registers, occupancy and local-memory stack traffic; benchmark on an idle GPU.</p>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">22 ·BVH ray tracing on CUDA</p>
-<aside>A few limitations and next steps. The BVH is now built on the GPU with three builders; the TRBVH build could go faster still, because one lane still grows and rewires each treelet and the largest subsets are solved by a single lane. Sorting AO rays by direction would make warps more coherent. I could not get the 28-million-triangle Lucy model, which would push the memory-bound trend further. And I would profile the traversal in Nsight Compute and rerun the benchmarks on a completely idle GPU to tighten the numbers.</aside>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">24 ·BVH ray tracing on CUDA</p>
+<aside>A few limitations and next steps. The BVH is now built on the GPU with four builders. The next step for quality is parallel reinsertion, which improves any GPU tree and could push it past the full-sweep reference; H-PLOC could get closer to the LBVH's speed by fusing the leaf collapse into the build, and TRBVH by spreading more of each treelet's work across the warp. Sorting AO rays by direction would make warps more coherent. I could not get the 28-million-triangle Lucy model, which would push the memory-bound trend further. And I would profile the traversal in Nsight Compute and rerun the benchmarks on a completely idle GPU to tighten the numbers.</aside>
 </section>

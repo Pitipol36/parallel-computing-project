@@ -1,0 +1,30 @@
+<section id="gpu-hploc" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">H-PLOC: PLOC quality in one kernel launch</h2>
+<div style="display:flex;gap:56px">
+<div style="flex:1;display:flex;flex-direction:column;gap:24px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0E7A85">H-PLOC · Benthin et al. 2024</p>
+<ol style="font-size:28px;line-height:1.45;color:#1B2233;padding-left:36px">
+<li>One thread per leaf climbs the Morton hierarchy bottom-up; the second thread to reach a node continues</li>
+<li>Each node joins its children's cluster lists</li>
+<li>Over 16 clusters: the whole warp runs PLOC merges on the list in shared memory until 16 remain</li>
+<li>No per-iteration launches, no readbacks</li>
+</ol>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">PLOC needed 68 iterations of 4+ launches and a readback each on the dragon.</p>
+</div>
+<div style="width:760px;display:flex;flex-direction:column;gap:28px">
+<table style="font-size:26px;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif">
+<tr><th style="width:34%">Build</th><th style="width:22%;text-align:right">LBVH</th><th style="width:22%;text-align:right">PLOC</th><th style="width:22%;text-align:right">H-PLOC</th></tr>
+<tr><td>bunny</td><td style="text-align:right">0.51 ms</td><td style="text-align:right">3.45 ms</td><td style="text-align:right"><b>0.91 ms</b></td></tr>
+<tr><td>dragon</td><td style="text-align:right">4.8 ms</td><td style="text-align:right">13.1 ms</td><td style="text-align:right"><b>9.2 ms</b></td></tr>
+<tr><td>buddha</td><td style="text-align:right">6.0 ms</td><td style="text-align:right">15.2 ms</td><td style="text-align:right"><b>11.5 ms</b></td></tr>
+<tr style="color:#4A5263"><td>SAH cost, scans</td><td style="text-align:right">119–130 %</td><td style="text-align:right">112 %</td><td style="text-align:right">111–113 %</td></tr>
+</table>
+<div style="display:flex;flex-direction:column;gap:8px;background:#10172A;padding:32px;border-radius:16px">
+<p style="font-size:32px;font-weight:600;line-height:1.3;color:#F3F4F1">1.3–3.8× faster than PLOC, same quality</p>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">The paper reports ~15 % over LBVH; mine is 1.9×: the warp merging and a flatten step slowed by scattered atomic node ids.</p>
+</div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">20 · Radius 8, threshold 16. The CPU twin flattens to the identical tree; 0 sanitizer errors or hazards on the cluster lists.</p>
+<aside>PLOC's weakness is its loop: on the dragon it runs 68 iterations, each with four or more kernel launches and a readback to the CPU to learn how many clusters are left. H-PLOC, published last year, removes the loop entirely. One kernel launch builds the whole tree: every thread starts at a leaf and climbs the Morton-code hierarchy bottom-up, and as with the LBVH fit, the second thread to arrive at a node carries on. Each node holds a short list of clusters. When the two children's lists together exceed sixteen, the whole warp loads them into shared memory and runs PLOC merges on them until sixteen are left; at the root it merges down to one. The result: the same tree quality as PLOC, 1.3 to 3.8 times faster. The paper gets within about 15 percent of the LBVH's time; mine takes about twice the LBVH's time, mostly the merging itself and a slower flatten step, because the atomically assigned node ids scatter the tree in memory.</aside>
+</section>

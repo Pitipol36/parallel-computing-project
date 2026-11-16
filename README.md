@@ -675,7 +675,7 @@ renders/   output images
 * ~~The BVH is built on the CPU~~: done with four GPU builders, see
   [GPU BVH construction](#gpu-bvh-construction-lbvh-ploc-h-ploc-trbvh).
 * **Not done from the second plan:**
-  - **PRBVH** (parallel reinsertion, Phase 2): no time before the presentation. It is the
+  - **PRBVH** (parallel reinsertion, Phase 2): not started yet. It is the
     natural next step to push GPU trees to or past the full-sweep reference.
   - **PLOC++** (optional Phase 1a).
   - **A downloaded mixed-size scene** (Sponza / San Miguel): replaced by the procedural one.
