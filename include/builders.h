@@ -5,7 +5,8 @@
 //   cpu_ploc  PLOC bottom-up clustering, single-threaded
 //   gpu_ploc  the same PLOC as CUDA kernels; node-for-node identical to cpu_ploc
 //   cpu_trbvh LBVH + TRBVH treelet restructuring (Karras & Aila 2013), single-threaded
-//   gpu_trbvh the same on the GPU, one thread per treelet; identical to cpu_trbvh
+//   gpu_trbvh the same on the GPU, one warp per treelet; identical to cpu_trbvh
+//   cpu_sah_full full-sweep SAH (every split on every axis): the tree-quality reference
 // Every builder emits the same flattened BVH (BVHNode + Tri), so all render modes run
 // unchanged on any tree.
 #pragma once
@@ -17,7 +18,7 @@
 #include "bvh.h"
 #include "mesh.h"
 
-enum class BuilderKind { CpuSah, CpuLbvh, GpuLbvh, CpuPloc, GpuPloc, CpuTrbvh, GpuTrbvh };
+enum class BuilderKind { CpuSah, CpuLbvh, GpuLbvh, CpuPloc, GpuPloc, CpuTrbvh, GpuTrbvh, CpuSahFull };
 
 const char* builder_name(BuilderKind b);
 bool parse_builder(const std::string& s, BuilderKind& b);
@@ -102,6 +103,9 @@ private:
 BVH build_ploc_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);
 bool build_ploc_gpu(const Mesh& mesh, const BuildParams& params, BVH* hostOut, DeviceBvh* devOut,
                     BuildReport* report, std::string& err);
+
+// Full-sweep SAH reference builder (CPU, O(n log^2 n)).
+BVH build_sah_full_cpu(const Mesh& mesh, const BuildParams& params, BuildReport* report);
 
 // Builds with any builder into a host BVH (GPU builders download the tree).
 bool build_with(BuilderKind kind, const Mesh& mesh, const BuildParams& params, BVH& out, BuildReport& report,

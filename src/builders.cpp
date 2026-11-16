@@ -14,13 +14,15 @@ const char* builder_name(BuilderKind b) {
         case BuilderKind::GpuPloc: return "gpu_ploc";
         case BuilderKind::CpuTrbvh: return "cpu_trbvh";
         case BuilderKind::GpuTrbvh: return "gpu_trbvh";
+        case BuilderKind::CpuSahFull: return "cpu_sah_full";
     }
     return "?";
 }
 
 bool parse_builder(const std::string& s, BuilderKind& b) {
     for (BuilderKind k : {BuilderKind::CpuSah, BuilderKind::CpuLbvh, BuilderKind::GpuLbvh, BuilderKind::CpuPloc,
-                          BuilderKind::GpuPloc, BuilderKind::CpuTrbvh, BuilderKind::GpuTrbvh})
+                          BuilderKind::GpuPloc, BuilderKind::CpuTrbvh, BuilderKind::GpuTrbvh,
+                          BuilderKind::CpuSahFull})
         if (s == builder_name(k)) { b = k; return true; }
     return false;
 }
@@ -49,6 +51,9 @@ bool build_with(BuilderKind kind, const Mesh& mesh, const BuildParams& params, B
             return true;
         case BuilderKind::GpuTrbvh:
             return build_lbvh_gpu(mesh, params, &out, nullptr, &report, err, true);
+        case BuilderKind::CpuSahFull:
+            out = build_sah_full_cpu(mesh, params, &report);
+            return true;
     }
     err = "unknown builder";
     return false;

@@ -48,6 +48,7 @@ struct Options {
     bool buildBench = false;
     std::string buildCsv;
     std::string statsCsv;
+    bool qualityBench = false;
     bool dynamic = false;
     int frames = 60;
     std::string dynamicCsv;
@@ -56,7 +57,8 @@ struct Options {
 void usage() {
     std::printf(
         "Usage: raytracer [options]\n"
-        "  --model PATH        PLY mesh (default: procedural sphere-on-ground test scene)\n"
+        "  --model PATH        PLY mesh, or mixed for the procedural mixed-size scene (default:\n"
+        "                      procedural sphere-on-ground test scene)\n"
         "  --label NAME        model name written to the CSV (default: file name)\n"
         "  --tag NAME          experiment name written to the CSV (default: run)\n"
         "  --mode LIST         comma list of: cpu, gpu_brute, gpu_bvh_naive, gpu_bvh_opt,\n"
@@ -72,7 +74,8 @@ void usage() {
         "  --csv FILE          append timing rows to a CSV file\n"
         "  --bins N --leaf N   SAH bins per axis (16) and max leaf size (4)\n"
         "  --build LIST        BVH builder: cpu_sah (default), cpu_lbvh, gpu_lbvh, cpu_ploc,\n"
-        "                      gpu_ploc, cpu_trbvh, gpu_trbvh; a comma list with --build-bench\n"
+        "                      gpu_ploc, cpu_trbvh, gpu_trbvh, cpu_sah_full (full-sweep reference);\n"
+        "                      a comma list with --build-bench / --quality-bench\n"
         "  --ploc-radius R     PLOC nearest-neighbour search radius (default 8)\n"
         "  --trbvh-passes P    TRBVH restructuring passes (default 3; gamma doubles each pass)\n"
         "  --trbvh-treelet N   TRBVH treelet leaves, 2..7 (default 7)\n"
@@ -82,6 +85,8 @@ void usage() {
         "  --build-bench       time each --build builder (--warmup/--runs, median per stage),\n"
         "                      print tree quality, append to --build-csv; no rendering\n"
         "  --build-csv FILE    CSV for --build-bench rows (default results/build.csv)\n"
+        "  --quality-bench     render every --build builder's tree with every --mode, warm-up\n"
+        "                      first, runs interleaved round-robin; median + IQR to --csv\n"
         "  --stats-csv FILE    append traversal counters per mode (RT_TRAVERSAL_STATS builds only)\n"
         "  --dynamic           exploding-mesh animation; per frame compares a cpu_sah rebuild, a\n"
         "                      gpu_lbvh rebuild, a refit of the frame-0 gpu_lbvh tree and a\n"
@@ -91,6 +96,8 @@ void usage() {
         "                      --out, every frame of the gpu_lbvh render is written as PNG\n"
         "  --yaw D --pitch D --fov D   camera orbit angles and field of view (25, 15, 35)\n"
         "  --up y|z            model up axis (default y)\n"
+        "  --cam orbit|inside  camera preset: orbit around the bounds (default) or inside the scene\n"
+        "                      (low and close; use with --model mixed)\n"
         "  --brute-rows N      rows per gpu_brute launch (default 8; keeps launches under the\n"
         "                      Windows watchdog)\n"
         "  --force             run gpu_brute even on large meshes\n"
@@ -145,6 +152,15 @@ bool parse_args(int argc, char** argv, Options& o) {
         else if (a == "--pitch") o.rp.pitchDeg = std::stof(next());
         else if (a == "--fov") o.rp.fovDeg = std::stof(next());
         else if (a == "--up") o.rp.upAxis = next() == "z" ? 2 : 1;
+        else if (a == "--cam") {
+            const std::string c = next();
+            if (c == "inside") {  // low and close, among the objects (for the mixed scene)
+                o.rp.yawDeg = 25; o.rp.pitchDeg = 10; o.rp.fovDeg = 60; o.rp.distScale = 0.3f; o.rp.targetHeight = 0.12f;
+            } else if (c != "orbit") {
+                std::fprintf(stderr, "--cam expects orbit or inside\n");
+                return false;
+            }
+        }
         else if (a == "--brute-rows") o.launch.bruteRowsPerLaunch = std::stoi(next());
         else if (a == "--force") o.force = true;
         else if (a == "--validate") o.validate = true;
@@ -152,6 +168,7 @@ bool parse_args(int argc, char** argv, Options& o) {
         else if (a == "--data-dir") o.dataDir = next();
         else if (a == "--build") o.builders = split(next(), ',');
         else if (a == "--build-bench") o.buildBench = true;
+        else if (a == "--quality-bench") o.qualityBench = true;
         else if (a == "--build-csv") o.buildCsv = next();
         else if (a == "--stats-csv") o.statsCsv = next();
         else if (a == "--dynamic") o.dynamic = true;
@@ -177,8 +194,8 @@ bool parse_args(int argc, char** argv, Options& o) {
         if (!parse_builder(b, bk)) { std::fprintf(stderr, "unknown builder %s\n", b.c_str()); return false; }
     }
     if (o.builders.empty()) o.builders = {"cpu_sah"};
-    if (o.builders.size() > 1 && !o.buildBench) {
-        std::fprintf(stderr, "--build takes one builder unless --build-bench is given\n");
+    if (o.builders.size() > 1 && !o.buildBench && !o.qualityBench) {
+        std::fprintf(stderr, "--build takes one builder unless --build-bench or --quality-bench is given\n");
         return false;
     }
     return true;
@@ -211,9 +228,20 @@ void print_tree(const char* builder, const BVH& bvh, const BuildReport& r) {
 }
 
 double median(std::vector<double> v) {
+    if (v.empty()) return 0;
     std::sort(v.begin(), v.end());
     size_t n = v.size();
     return n % 2 ? v[n / 2] : 0.5 * (v[n / 2 - 1] + v[n / 2]);
+}
+
+// q-th quantile (0..1) with linear interpolation between order statistics.
+double quantile(std::vector<double> v, double q) {
+    if (v.empty()) return 0;
+    std::sort(v.begin(), v.end());
+    const double pos = q * double(v.size() - 1);
+    const size_t i = size_t(pos);
+    const double f = pos - double(i);
+    return i + 1 < v.size() ? v[i] * (1 - f) + v[i + 1] * f : v[i];
 }
 
 using Clock = std::chrono::high_resolution_clock;
@@ -226,6 +254,18 @@ bool load_scene(const std::string& path, Mesh& mesh) {
     }
     std::string err;
     auto t0 = Clock::now();
+    if (path == "mixed") {  // procedural mixed-size scene built from the dragon and the bunny in data/
+        Mesh dragon, bunny;
+        if (!load_ply("data/dragon_vrip.ply", dragon, err) || !load_ply("data/bun_zipper.ply", bunny, err)) {
+            std::fprintf(stderr, "error: --model mixed needs data/dragon_vrip.ply and data/bun_zipper.ply: %s\n",
+                         err.c_str());
+            return false;
+        }
+        mesh = make_mixed_scene(dragon, bunny);
+        std::printf("Mixed-size scene: %zu vertices, %zu triangles (%.0f ms)\n", mesh.vertices.size(),
+                    mesh.faces.size(), ms_since(t0));
+        return true;
+    }
     if (!load_ply(path, mesh, err)) {
         std::fprintf(stderr, "error: %s\n", err.c_str());
         return false;
@@ -285,7 +325,7 @@ int run_benchmark(const Options& o) {
         if (fs::path(o.csv).has_parent_path()) fs::create_directories(fs::path(o.csv).parent_path());
         csv.open(o.csv, std::ios::app);
         if (!exists)
-            csv << "experiment,model,tris,width,height,ao,mode,block,runs,build_ms,kernel_ms,e2e_ms,upload_ms,download_ms,mrays_per_s\n";
+            csv << "experiment,model,tris,width,height,ao,mode,block,runs,build_ms,kernel_ms,e2e_ms,upload_ms,download_ms,mrays_per_s,p25_ms,p75_ms\n";
     }
 
     std::printf("\n%-20s %12s %12s %12s %10s\n", "mode", "kernel ms", "e2e ms", "Mrays/s", "speedup");
@@ -353,7 +393,8 @@ int run_benchmark(const Options& o) {
         if (csv.is_open())
             csv << o.tag << "," << label << "," << mesh.faces.size() << "," << o.rp.width << "," << o.rp.height << ","
                 << o.rp.aoSamples << "," << m << "," << block << "," << kern.size() << "," << bvh.buildMs << ","
-                << k << "," << e << "," << median(up) << "," << median(down) << "," << mrays << "\n";
+                << k << "," << e << "," << median(up) << "," << median(down) << "," << mrays << ","
+                << quantile(kern, 0.25) << "," << quantile(kern, 0.75) << "\n";
         if (!o.out.empty()) {
             std::string p = out_path(o.out, m, o.modes.size() > 1);
             if (fs::path(p).has_parent_path()) fs::create_directories(fs::path(p).parent_path());
@@ -361,6 +402,104 @@ int run_benchmark(const Options& o) {
         }
     }
     return failures ? 1 : 0;
+}
+
+// ---------------------------------------------------------------- quality benchmark
+
+// Renders several builders' trees under the same conditions: every tree is built first, the
+// GPU is warmed up for a few seconds so clocks settle, then the timed renders run round-robin
+// (run 1 of every builder and mode, then run 2, ...), so slow drift in clocks or temperature
+// affects every builder equally. One CSV row per builder and mode (tag <tag>_<builder>), with
+// the median and the interquartile range of the kernel time.
+int run_quality_bench(const Options& o) {
+    Mesh mesh;
+    if (!load_scene(o.model, mesh)) return 1;
+    std::string label = o.label.empty() ? (o.model.empty() ? "testscene" : fs::path(o.model).stem().string()) : o.label;
+    std::vector<BVH> trees(o.builders.size());
+    for (size_t b = 0; b < o.builders.size(); ++b) {
+        BuildReport br;
+        std::string err;
+        if (!build_with(builder_of(o.builders[b]), mesh, o.bp, trees[b], br, err)) {
+            std::fprintf(stderr, "build failed (%s): %s\n", o.builders[b].c_str(), err.c_str());
+            return 1;
+        }
+        print_tree(o.builders[b].c_str(), trees[b], br);
+    }
+    ShadeParams sp = make_shade_params(mesh.bounds(), o.rp);
+    const size_t px = size_t(o.rp.width) * o.rp.height;
+    const double rays = double(px) * (2 + o.rp.aoSamples);
+    std::string gdesc;
+    size_t freeB = 0, totalB = 0;
+    if (!gpu_info(gdesc, freeB, totalB)) { std::fprintf(stderr, "no CUDA device\n"); return 1; }
+    std::printf("Quality bench: %dx%d, %d AO, %zu builders x %zu modes, %d runs (round-robin)\n", o.rp.width,
+                o.rp.height, o.rp.aoSamples, o.builders.size(), o.modes.size(), o.runs);
+
+    const size_t B = o.builders.size(), M = o.modes.size();
+    std::vector<std::vector<double>> kern(B * M), e2e(B * M), up(B * M), down(B * M);
+    std::vector<uint32_t> pixels;
+    auto run_one = [&](size_t b, size_t m, bool record) -> bool {
+        const std::string& mode = o.modes[m];
+        double k = 0, e = 0, u = 0, d = 0;
+        if (mode == "cpu") {
+            k = e = render_cpu(trees[b], sp, pixels, nullptr);
+        } else {
+            GpuMode gm;
+            parse_gpu_mode(mode, gm);
+            GpuTimings tm;
+            std::string err;
+            if (!render_gpu(trees[b], mesh, gm, sp, o.launch, pixels, nullptr, tm, err)) {
+                std::fprintf(stderr, "%s / %s failed: %s\n", o.builders[b].c_str(), mode.c_str(), err.c_str());
+                return false;
+            }
+            k = tm.kernelMs; e = tm.e2eMs; u = tm.uploadMs; d = tm.downloadMs;
+        }
+        if (record) {
+            kern[b * M + m].push_back(k);
+            e2e[b * M + m].push_back(e);
+            up[b * M + m].push_back(u);
+            down[b * M + m].push_back(d);
+        }
+        return true;
+    };
+    // Warm-up: render every GPU combination until at least 3 s have passed.
+    auto tw = Clock::now();
+    do {
+        for (size_t b = 0; b < B; ++b)
+            for (size_t m = 0; m < M; ++m)
+                if (o.modes[m] != "cpu" && !run_one(b, m, false)) return 1;
+    } while (ms_since(tw) < 3000.0);
+    const int cpuRuns = o.cpuRuns > 0 ? o.cpuRuns : o.runs;
+    for (int r = 0; r < o.runs; ++r)
+        for (size_t b = 0; b < B; ++b)
+            for (size_t m = 0; m < M; ++m) {
+                if (o.modes[m] == "cpu" && r >= cpuRuns) continue;
+                if (!run_one(b, m, true)) return 1;
+            }
+
+    std::ofstream csv;
+    if (!o.csv.empty()) {
+        bool exists = fs::exists(o.csv);
+        if (fs::path(o.csv).has_parent_path()) fs::create_directories(fs::path(o.csv).parent_path());
+        csv.open(o.csv, std::ios::app);
+        if (!exists)
+            csv << "experiment,model,tris,width,height,ao,mode,block,runs,build_ms,kernel_ms,e2e_ms,upload_ms,download_ms,mrays_per_s,p25_ms,p75_ms\n";
+    }
+    std::printf("\n%-12s %-20s %10s %10s %10s\n", "builder", "mode", "median ms", "p25 ms", "p75 ms");
+    char block[32];
+    std::snprintf(block, sizeof(block), "%dx%d", o.launch.blockX, o.launch.blockY);
+    for (size_t b = 0; b < B; ++b)
+        for (size_t m = 0; m < M; ++m) {
+            const auto& kv = kern[b * M + m];
+            const double k = median(kv), p25 = quantile(kv, 0.25), p75 = quantile(kv, 0.75);
+            std::printf("%-12s %-20s %10.2f %10.2f %10.2f\n", o.builders[b].c_str(), o.modes[m].c_str(), k, p25, p75);
+            if (csv.is_open())
+                csv << o.tag << "_" << o.builders[b] << "," << label << "," << mesh.faces.size() << "," << o.rp.width
+                    << "," << o.rp.height << "," << o.rp.aoSamples << "," << o.modes[m] << ","
+                    << (o.modes[m] == "cpu" ? "-" : block) << "," << kv.size() << "," << trees[b].buildMs << "," << k
+                    << "," << median(e2e[b * M + m]) << "," << median(up[b * M + m]) << ","
+                    << median(down[b * M + m]) << "," << rays / (k * 1e3) << "," << p25 << "," << p75 << "\n";
+        }
+    return 0;
 }
 
 // ---------------------------------------------------------------- build benchmark
@@ -746,5 +885,6 @@ int main(int argc, char** argv) {
     if (!parse_args(argc, argv, o)) return 2;
     if (o.verify) return run_verify(o);
     if (o.dynamic) return run_dynamic(o);
+    if (o.qualityBench) return run_quality_bench(o);
     return o.buildBench ? run_build_bench(o) : run_benchmark(o);
 }

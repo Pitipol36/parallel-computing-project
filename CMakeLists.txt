@@ -31,6 +31,7 @@ add_library(rt_core STATIC
   src/mesh.cpp
   src/ply_loader.cpp
   src/bvh_build.cpp
+  src/bvh_build_sah_full.cpp
   src/bvh_build_lbvh_cpu.cpp
   src/gpu_build_common.cu
   src/bvh_build_lbvh_gpu.cu

@@ -27,3 +27,8 @@ Mesh make_icosphere(int subdiv);
 
 // Small test scene: an icosphere sitting on a ground quad, so shadows and AO show up.
 Mesh make_test_scene(int subdiv);
+
+// Mixed triangle sizes (the procedural stand-in for Sponza-like scenes): 8 huge ground
+// triangles, the dragon, the bunny at three scales (0.08x, 0.6x, 1.6x the dragon) and ~140 thin
+// pillar boxes. Y up.
+Mesh make_mixed_scene(const Mesh& dragon, const Mesh& bunny);

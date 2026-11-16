@@ -3,6 +3,8 @@
 ShadeParams make_shade_params(const AABB& bounds, const RenderParams& rp) {
     const float deg = 3.14159265f / 180.0f;
     vec3 center = (bounds.bmin + bounds.bmax) * 0.5f;
+    if (rp.upAxis == 2) center.z = bounds.bmin.z + rp.targetHeight * (bounds.bmax.z - bounds.bmin.z);
+    else                center.y = bounds.bmin.y + rp.targetHeight * (bounds.bmax.y - bounds.bmin.y);
     float diag = length(bounds.bmax - bounds.bmin);
     float radius = 0.5f * diag;
 
@@ -14,7 +16,7 @@ ShadeParams make_shade_params(const AABB& bounds, const RenderParams& rp) {
     float yaw = rp.yawDeg * deg, pitch = rp.pitchDeg * deg, halfFov = 0.5f * rp.fovDeg * deg;
     vec3 offs = (X0 * sinf(yaw) + Z0 * cosf(yaw)) * cosf(pitch) + U * sinf(pitch);
     // Fits the bounding sphere (with a little margin for perspective) in the shorter side.
-    float dist = radius / sinf(halfFov) * 0.95f;
+    float dist = radius / sinf(halfFov) * 0.95f * rp.distScale;
 
     ShadeParams sp;
     Camera& c = sp.cam;

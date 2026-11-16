@@ -17,6 +17,8 @@ struct RenderParams {
     float yawDeg = 25.0f;       // orbit around the up axis
     float pitchDeg = 15.0f;     // elevation
     int upAxis = 1;             // 1 = +Y up, 2 = +Z up
+    float distScale = 1.0f;     // camera distance relative to the fitted orbit (< 1 = closer)
+    float targetHeight = 0.5f;  // look-at point: fraction of the bounds' height along the up axis
     uint32_t seed = 1234u;
 };
 
