@@ -5,7 +5,7 @@
 #                      back to back, --quality-bench method (warm-up, interleaved, median + IQR)
 #   powershell -ExecutionPolicy Bypass -File scripts\run_prbvh_benchmarks.ps1 [-Quick]
 # The full-SAH reference cost comes from results\build.csv (scripts\run_build_benchmarks.ps1).
-param([switch]$Quick)
+param([switch]$Quick, [switch]$BuildOnly)  # -BuildOnly: redo prbvh.csv, keep prbvh_render.csv
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -13,7 +13,9 @@ $exe = Join-Path $root "build\raytracer.exe"
 if (-not (Test-Path $exe)) { throw "build first: scripts\build.ps1" }
 New-Item -ItemType Directory -Force results | Out-Null
 $csv = "results\prbvh.csv"; $renderCsv = "results\prbvh_render.csv"
-foreach ($f in $csv, $renderCsv) { if (Test-Path $f) { Remove-Item $f } }
+foreach ($f in $csv, $renderCsv) {
+    if ((Test-Path $f) -and -not ($BuildOnly -and $f -eq $renderCsv)) { Remove-Item $f }
+}
 
 $runs = if ($Quick) { 1 } else { 5 }
 $qruns = if ($Quick) { 3 } else { 11 }
@@ -52,6 +54,7 @@ foreach ($i in 1, 2, 4, 8, 16, 32) {
 
 # 3. Render time on the trees, base then PRBVH, 16 AO at 1080p.
 foreach ($m in $dragon, $mixed) {
+    if ($BuildOnly) { break }
     foreach ($o in "none", "prbvh") {
         $tag = if ($o -eq "none") { "base" } else { "prbvh" }
         Run $m @("--quality-bench", "--build", $builders, "--optimize", $o, "--width", "1920", "--height", "1080",

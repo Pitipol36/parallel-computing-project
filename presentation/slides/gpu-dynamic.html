@@ -18,6 +18,6 @@
 </table>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">23 · 1280×720, 4 AO; update + render per frame (a busier machine than earlier runs: compare rows, not runs). Refit only recomputes boxes (1.6 ms).</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">24 · 1280×720, 4 AO; update + render per frame (a busier machine than earlier runs: compare rows, not runs). Refit only recomputes boxes (1.6 ms).</p>
 <aside>Where a fast build really matters is a scene that changes every frame. Here the dragon explodes and every triangle flies off in its own random direction. The cheapest update is a refit: keep the tree, recompute the boxes. It takes about a millisecond, but triangles that started as neighbours end up far apart, so the old boxes stretch across the whole explosion. The tree's SAH cost grows a thousandfold and the last frame takes 40 seconds to render. Rebuilding on the CPU keeps the tree good but costs one and a half seconds per frame in this run. Rebuilding on the GPU every frame keeps every tree close to SAH quality: the LBVH runs at 34 frames per second, H-PLOC at 31, PLOC at 26 and TRBVH at 12, and TRBVH's tree stays within one percent of the CPU SAH rebuild. Once the pieces are scattered, PLOC's and H-PLOC's advantage over the LBVH disappears, so for this scene the fastest builder wins.</aside>
 </section>

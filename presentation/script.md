@@ -1,7 +1,7 @@
 # Presentation script: BVH Ray Tracing of Large Triangle Meshes on CUDA
 
-The original talk (slides 1–16, 24–25) is about 12 minutes; the GPU-build follow-up (slides
-17–23) adds about 5 minutes, so the whole deck runs about 17 minutes plus Q&A. If the slot is
+The original talk (slides 1–16, 25–26) is about 12 minutes; the GPU-build follow-up (slides
+17–24) adds about 5¾ minutes, so the whole deck runs about 18 minutes plus Q&A. If the slot is
 15 minutes, either present the follow-up as its own block, or drop slides 15–16 and 22 (the
 follow-up's points survive without them). About 2,500 spoken words at ~150 words per minute; time
 a rehearsal. Lines in *[brackets and italics]* are stage directions. Items in plain `[brackets]` are
@@ -15,8 +15,8 @@ facts only you know, so fill them in before rehearsing.
 | Parallel design and kernels | 9–10 | 1:55 |
 | Correctness | 11 | 0:40 |
 | Results | 12–16 | 2:45 |
-| Follow-up: building the BVH on the GPU | 17–23 | 5:00 |
-| Wrap-up | 24–25 | 0:35 |
+| Follow-up: building the BVH on the GPU | 17–24 | 5:40 |
+| Wrap-up | 25–26 | 0:35 |
 
 If you run long, shorten the results section (slides 15–16), not the BVH section.
 
@@ -261,24 +261,36 @@ builder is on the front. LBVH is the fastest and the loosest, H-PLOC is the midd
 TRBVH gets closest to the reference while still building 16 times faster than the CPU. So the right
 builder depends on how many rays one tree will serve.
 
-## Slide 23: Dynamic scenes: rebuild every frame (0:30)
+## Slide 23: Parallel reinsertion: past the CPU reference (0:40)
+
+The last step works on any of these trees. Parallel reinsertion asks, for every node at once:
+where else could this node go so the tree's SAH cost drops the most? Moves that don't touch the
+same nodes are applied together: each one locks its six nodes with an atomic max, the winners
+move, and the boxes are refitted. After eight rounds every GPU tree is within a few percent of the
+full-sweep reference on the scans, and TRBVH plus PRBVH beats it. On the mixed scene all four end up
+5 to 15 percent **better** than the full sweep, which is still greedy at the top. H-PLOC plus PRBVH
+builds the dragon in 240 milliseconds with a better tree than the CPU builder's 760. Renders get 8
+to 43 percent faster, so the extra time pays off after 11 to 65 frames.
+
+## Slide 24: Dynamic scenes: rebuild every frame (0:30)
 
 *[Let the animation play.]* Where a fast build really matters is a scene that changes every frame.
 The dragon explodes. Refitting the old tree costs a millisecond, but its boxes stretch across the
 explosion and rendering slows to tens of seconds per frame. Rebuilding on the GPU every frame keeps
 the tree good at 12 to 34 frames per second; the CPU needs one and a half seconds per frame.
 
-## Slide 24: Limitations and future work (0:25)
+## Slide 25: Limitations and future work (0:25)
 
-The next step for tree quality is parallel reinsertion, which improves any GPU tree and could push
-it past the full-sweep reference. H-PLOC could get closer to the LBVH's speed by folding the leaf
-collapse into the build. And I'd still like to try the 28-million-triangle Lucy.
+Most of PRBVH's time is its exact search over the whole tree; searching only near each node would
+trade a little quality for a lot of time. H-PLOC could get closer to the LBVH's speed by folding the
+leaf collapse into the build. And I'd still like to try the 28-million-triangle Lucy.
 
-## Slide 25: Questions (0:10)
+## Slide 26: Questions (0:10)
 
 To sum up: going from my ten-sphere Python ray tracer to a million triangles took two steps. A BVH
 made each ray's search logarithmic, and the GPU ran millions of those searches at once. And now the
-GPU builds that tree too, in milliseconds, close to the quality of the best CPU builder. Thank you,
+GPU builds that tree too: in milliseconds close to the best CPU builder's quality, or in a quarter
+of a second better than it. Thank you,
 and I'm happy to take questions.
 
 ---
@@ -289,13 +301,20 @@ and I'm happy to take questions.
   (at most 2N − 1 nodes). It builds fast, and it handles uneven scan density well. A uniform grid
   wastes cells on empty space. A kd-tree has to copy triangles that straddle split planes.
 - **Why build the BVH on the CPU in the main results?** It keeps the comparison fair: both versions
-  use the identical tree. The follow-up (slides 17–23) then builds it on the GPU.
+  use the identical tree. The follow-up (slides 17–24) then builds it on the GPU.
 - **How do you know the GPU builders are correct?** Each one has a single-threaded CPU twin running the
   same shared code, and the GPU tree must equal it byte for byte; every tree must also give the same
   triangle per pixel as the SAH tree, and `compute-sanitizer` must report no errors or races.
 - **Why is your H-PLOC slower than the paper's?** About half the extra time is the warp merging itself,
   the rest is the flatten step: node ids come from an atomic counter, so the tree is scattered in
   memory. The paper fuses the leaf collapse into the build, which I didn't.
+- **How can a GPU tree beat the full-sweep SAH reference?** The full sweep is greedy: it picks the
+  best split at each node from the top down and never revisits it. Reinsertion measures the whole
+  tree's cost and moves subtrees across those early splits. The mixed scene, with huge and tiny
+  triangles meeting near the root, is where the greedy choice is worst.
+- **Why are PRBVH's CPU and GPU trees identical?** Each round is a pure function of the tree at the
+  start of the round. Ties are broken by the node's in-order position, not by its id, so the
+  H-PLOC tree (whose GPU ids come from an atomic counter) makes the same moves on both.
 - **Why is binned SAH not 100 %?** Binning only tries 15 split planes per axis. On uniform scans that
   costs about 1 %, but on mixed triangle sizes 11 %; the full sweep tries every split.
 - **Why didn’t persistent threads help?** The technique came from GPUs whose block scheduler handled

@@ -475,6 +475,119 @@ def hploc_plot(build):
     save(fig, "hploc_sweep.png")
 
 
+# ---------------------------------------------------------------- PRBVH
+
+PR_BUILDERS = ["gpu_lbvh", "gpu_ploc", "gpu_hploc", "gpu_trbvh"]
+
+
+def prbvh_plots(build, prb, prender):
+    refc = ref_costs(build)
+    base = {(r["model"], r["builder"]): r for r in prb if r["experiment"] == "base"}
+    opt = {(r["model"], r["builder"]): r for r in prb if r["experiment"] == "prbvh"}
+    models = [m for m in models_in([r for r in prb if r["experiment"] == "base"]) if m in refc]
+    if not models:
+        return
+    # 1. Tree quality with and without PRBVH, per model.
+    fig, ax = plt.subplots(figsize=(11, 4.6))
+    w = 0.8 / len(PR_BUILDERS)
+    for j, b in enumerate(PR_BUILDERS):
+        for i, m in enumerate(models):
+            if (m, b) not in base or (m, b) not in opt:
+                continue
+            x = i + (j - (len(PR_BUILDERS) - 1) / 2) * w
+            y0 = 100 * base[(m, b)]["sah_cost"] / refc[m]
+            y1 = 100 * opt[(m, b)]["sah_cost"] / refc[m]
+            ax.bar([x], [y0 - 100], bottom=100, width=w * 0.9, color=COLORS[b], alpha=0.28, edgecolor="none")
+            ax.bar([x], [y1 - 100], bottom=100, width=w * 0.9, color=COLORS[b],
+                   label=TREE_LABELS[b] if i == 0 else None)
+            ax.annotate(f"{y1:.0f}", (x, y1), textcoords="offset points", xytext=(0, 3), ha="center",
+                        fontsize=8, color=TEXT2)
+    ax.axhline(100, color=TEXT, linewidth=1)
+    ax.set_xticks(range(len(models)))
+    ax.set_xticklabels([tick(m, prb) for m in models])
+    ax.set_ylabel(f"SAH cost (% of {ref_label(build)})")
+    ax.set_title("PRBVH: faint bar = builder alone, solid bar = after 8 reinsertion rounds", loc="left")
+    ax.legend(loc="upper left", fontsize=9)
+    save(fig, "prbvh_quality.png")
+
+    # 2. Convergence (dragon): quality and optimizer time against rounds.
+    its = [r for r in prb if r["experiment"] == "prbvh_iters"]
+    if its and its[0]["model"] in refc:
+        m = its[0]["model"]
+        fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
+        for b in PR_BUILDERS:
+            pts = sorted([r for r in its if r["builder"] == b], key=lambda r: (r["prbvh_rounds"], r["optimize_ms"]))
+            if not pts:
+                continue
+            xs = [0] + [int(r["prbvh_rounds"]) for r in pts]
+            ys = [100 * base[(m, b)]["sah_cost"] / refc[m]] + [100 * r["sah_cost"] / refc[m] for r in pts]
+            axes[0].plot(xs, ys, marker="o", color=COLORS[b], label=TREE_LABELS[b])
+            axes[1].plot(xs, [0] + [r["optimize_ms"] for r in pts], marker="o", color=COLORS[b],
+                         label=TREE_LABELS[b])
+        axes[0].axhline(100, color=TEXT, linewidth=1)
+        axes[0].set_ylabel(f"SAH cost (% of {ref_label(build)})")
+        axes[0].set_title("Tree quality", loc="left")
+        axes[1].set_ylabel("PRBVH time (ms)")
+        axes[1].set_title("Optimizer time", loc="left")
+        axes[1].set_ylim(bottom=0)
+        for ax in axes:
+            ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+            ax.set_xlabel("rounds kept")
+            ax.legend(loc="best", fontsize=9)
+        fig.suptitle(f"PRBVH convergence ({m})", x=0.01, ha="left", fontweight="bold")
+        save(fig, "prbvh_convergence.png")
+
+    # 3. Build time vs quality: an arrow from each builder alone to the same builder + PRBVH.
+    size = [r for r in build if r["experiment"] == "size"]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), sharey=False)
+    for ax, m in zip(axes, [mm for mm in ("dragon", "mixed") if mm in models]):
+        for b in ("cpu_sah", "cpu_sah_full"):
+            r = next((r for r in size if r["model"] == m and r["builder"] == b), None)
+            if r:
+                ax.scatter([r["build_ms"]], [100 * r["sah_cost"] / refc[m]], color=COLORS[b], marker="s", s=60,
+                           label=TREE_LABELS[b], zorder=3)
+        for b in PR_BUILDERS:
+            if (m, b) not in base or (m, b) not in opt:
+                continue
+            x0, y0 = base[(m, b)]["build_ms"], 100 * base[(m, b)]["sah_cost"] / refc[m]
+            x1, y1 = opt[(m, b)]["build_ms"], 100 * opt[(m, b)]["sah_cost"] / refc[m]
+            ax.annotate("", (x1, y1), (x0, y0), arrowprops=dict(arrowstyle="->", color=COLORS[b], lw=1.6))
+            ax.scatter([x0], [y0], color=COLORS[b], alpha=0.35, s=50, zorder=3)
+            ax.scatter([x1], [y1], color=COLORS[b], s=60, zorder=3, label=TREE_LABELS[b] + " + PRBVH")
+        ax.set_xscale("log")
+        ax.set_xlabel("build time (ms, log scale)")
+        ax.set_ylabel(f"SAH cost (% of {ref_label(build)})")
+        ax.set_title(m, loc="left")
+        ax.legend(loc="upper right", fontsize=8)
+    fig.suptitle("PRBVH moves every builder down (better) and right (slower)", x=0.01, ha="left",
+                 fontweight="bold")
+    save(fig, "prbvh_pareto.png")
+
+    # 4. Render time base vs PRBVH (16 AO, 1080p).
+    rr = {(r["experiment"], r["model"]): r for r in prender if r["mode"] == "gpu_bvh_opt"}
+    rmodels = [m for m in ("dragon", "mixed") if any(k[1] == m for k in rr)]
+    if not rmodels:
+        return
+    fig, axes = plt.subplots(1, len(rmodels), figsize=(5.5 * len(rmodels), 4.2), squeeze=False)
+    for ax, m in zip(axes[0], rmodels):
+        for j, b in enumerate(PR_BUILDERS):
+            for k, tag in enumerate(("base", "prbvh")):
+                r = rr.get((f"{tag}_{b}", m))
+                if not r:
+                    continue
+                x = j + (k - 0.5) * 0.38
+                ax.bar([x], [r["kernel_ms"]], width=0.36, color=COLORS[b], alpha=0.35 if k == 0 else 1.0,
+                       yerr=[[r["kernel_ms"] - r["p25_ms"]], [r["p75_ms"] - r["kernel_ms"]]], capsize=3,
+                       ecolor=TEXT2)
+                ax.annotate(f"{r['kernel_ms']:.0f}", (x, r["kernel_ms"]), textcoords="offset points",
+                            xytext=(0, 4), ha="center", fontsize=8, color=TEXT2)
+        ax.set_xticks(range(len(PR_BUILDERS)))
+        ax.set_xticklabels([TREE_LABELS[b] for b in PR_BUILDERS])
+        ax.set_ylabel("render kernel (ms, median, IQR bars)")
+        ax.set_title(f"{m}: faint = alone, solid = + PRBVH", loc="left")
+    save(fig, "prbvh_render.png")
+
+
 def main():
     build, render = read("build.csv"), read("build_render.csv")
     trav, dyn = read("traversal.csv"), read("dynamic.csv")
@@ -488,6 +601,7 @@ def main():
     time_to_image_plot(build, render)
     dynamic_plots(dyn)
     explode_gif()
+    prbvh_plots(build, read("prbvh.csv"), read("prbvh_render.csv"))
 
 
 if __name__ == "__main__":
