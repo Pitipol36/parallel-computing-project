@@ -3,14 +3,14 @@
   "createdOnFiles": {"v": 1, "at": "2026-10-29T18:00:00Z"},
   "lists": "css",
   "title": "BVH Ray Tracing of Large Triangle Meshes on CUDA",
-  "order": ["cover", "problem", "dataset", "brute", "sequential", "bvh-build", "bvh-traverse", "baseline", "parallel", "kernels", "correctness", "headline", "size", "scaling", "ablation", "breakdown", "gpu-intro", "gpu-lbvh", "gpu-tradeoff", "gpu-better", "gpu-hploc", "gpu-mixed", "gpu-pareto", "gpu-prbvh", "gpu-dynamic", "limits", "qa"],
+  "order": ["cover", "problem", "dataset", "brute", "sequential", "bvh-build", "bvh-traverse", "baseline", "parallel", "kernels", "correctness", "headline", "size", "scaling", "ablation", "breakdown", "gpu-intro", "gpu-lbvh", "gpu-tradeoff", "gpu-better", "gpu-hploc", "gpu-mixed", "gpu-pareto", "gpu-prbvh", "gpu-e2e", "gpu-dynamic", "limits", "qa"],
   "sections": {
     "intro": {"description": "The problem and the dataset", "start": "cover"},
     "seq": {"description": "Brute force, then the sequential SAH BVH solution and why it is the best sequential version", "start": "brute"},
     "par": {"description": "The parallel design and the four kernel versions", "start": "parallel"},
     "check": {"description": "Correctness: CPU and GPU produce the same image", "start": "correctness"},
     "results": {"description": "Speedups, ablation and where the time goes", "start": "headline"},
-    "gpubuild": {"description": "Follow-up: a recap, then building the BVH on the GPU (LBVH, PLOC, H-PLOC, TRBVH), a harder scene, the speed/quality trade-off, parallel reinsertion (PRBVH) and dynamic scenes", "start": "gpu-intro"},
+    "gpubuild": {"description": "Follow-up: a recap, then building the BVH on the GPU (LBVH, PLOC, H-PLOC, TRBVH), a harder scene, the speed/quality trade-off, parallel reinsertion (PRBVH), total time to the first image and dynamic scenes", "start": "gpu-intro"},
     "end": {"description": "Limitations, future work and questions", "start": "limits"}
   },
   "faces": {

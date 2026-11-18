@@ -588,6 +588,74 @@ def prbvh_plots(build, prb, prender):
     save(fig, "prbvh_render.png")
 
 
+# ---------------------------------------------------------------- end-to-end time to image
+
+E2E_PARTS = [("build_ms", "build", "#2a78d6"), ("mesh_upload_ms", "mesh upload", "#74c6cf"),
+             ("tree_upload_ms", "tree upload", "#eda100"), ("render_ms", "render (gpu_bvh_opt)", "#d6457a"),
+             ("download_ms", "image download", "#7a5bd6"), ("other_ms", "allocations, frees, host", "#8a8984")]
+
+
+def e2e_label(b):
+    base = b.replace("+prbvh", "")
+    name = TREE_LABELS.get(base, base)
+    return name + (" + PRBVH" if b.endswith("+prbvh") else "")
+
+
+def e2e_plots(e2e):
+    if not e2e:
+        return
+    # 1. Stacked start-to-finish bars at 16 AO.
+    rows16 = [r for r in e2e if r["experiment"] == "ao16"]
+    models = [m for m in ("dragon", "mixed") if any(r["model"] == m for r in rows16)]
+    if models:
+        fig, axes = plt.subplots(1, len(models), figsize=(7 * len(models), 5.2), squeeze=False)
+        for ax, m in zip(axes[0], models):
+            rs = sorted([r for r in rows16 if r["model"] == m], key=lambda r: r["total_ms"], reverse=True)
+            cap = 1.25 * max(r["total_ms"] for r in rs if r["builder"] not in ("cpu_sah_full",))
+            for i, r in enumerate(rs):
+                left = 0.0
+                for k, name, col in E2E_PARTS:
+                    v = max(0.0, r[k] or 0.0)
+                    ax.barh([i], [min(v, max(0.0, cap - left))], left=left, color=col, height=0.7,
+                            label=name if i == 0 else None)
+                    left += v
+                txt = f"{r['total_ms']:,.0f} ms" if r["total_ms"] >= 100 else f"{r['total_ms']:.1f} ms"
+                x = min(r["total_ms"], cap)
+                ax.annotate(txt + (" (axis cut)" if r["total_ms"] > cap else ""), (x, i), textcoords="offset points",
+                            xytext=(4, 0), va="center", fontsize=8.5, color=TEXT2)
+            ax.set_yticks(range(len(rs)))
+            ax.set_yticklabels([e2e_label(r["builder"]) for r in rs])
+            ax.set_xlim(0, cap * 1.18)
+            ax.set_xlabel("time to image, mesh in RAM -> image in RAM (ms)")
+            ax.set_title(f"{m}, 1080p, 16 AO", loc="left")
+            ax.grid(axis="y", visible=False)
+        handles, labels = axes[0][0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="lower center", ncol=6, fontsize=9, bbox_to_anchor=(0.5, -0.01))
+        fig.suptitle("Total time to the first image per BVH builder (one wall clock, median of 5)", x=0.01,
+                     ha="left", fontweight="bold")
+        fig.tight_layout(rect=(0, 0.06, 1, 1))
+        save(fig, "e2e_breakdown.png")
+    # 2. Total time against AO samples (dragon and mixed).
+    models = [m for m in ("dragon", "mixed") if any(r["model"] == m for r in e2e)]
+    if not models:
+        return
+    fig, axes = plt.subplots(1, len(models), figsize=(6.5 * len(models), 4.6), squeeze=False)
+    for ax, m in zip(axes[0], models):
+        for b in sorted({r["builder"] for r in e2e if r["model"] == m}):
+            pts = sorted([(r["ao"], r["total_ms"]) for r in e2e if r["model"] == m and r["builder"] == b])
+            base = b.replace("+prbvh", "")
+            ax.plot([p[0] for p in pts], [p[1] for p in pts], marker="o", color=COLORS.get(base, TEXT2),
+                    linestyle="--" if b.endswith("+prbvh") else "-", label=e2e_label(b))
+        ax.set_yscale("log")
+        ax.set_xscale("log", base=2)
+        ax.set_xlabel("AO samples per pixel (1080p)")
+        ax.set_ylabel("time to image (ms, log scale)")
+        ax.set_title(m, loc="left")
+    axes[0][-1].legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8.5)
+    fig.suptitle("Time to image vs rays: dashed = with PRBVH", x=0.01, ha="left", fontweight="bold")
+    save(fig, "e2e_vs_ao.png")
+
+
 def main():
     build, render = read("build.csv"), read("build_render.csv")
     trav, dyn = read("traversal.csv"), read("dynamic.csv")
@@ -602,6 +670,7 @@ def main():
     dynamic_plots(dyn)
     explode_gif()
     prbvh_plots(build, read("prbvh.csv"), read("prbvh_render.csv"))
+    e2e_plots(read("e2e.csv"))
 
 
 if __name__ == "__main__":

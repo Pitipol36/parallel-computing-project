@@ -1,0 +1,194 @@
+
+>>> bunny 4 AO
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (30 ms)
+E2E bench: bunny, 69451 tris, 1920x1080, 4 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                  64.5      64.0      64.9     54.77      0.00      1.90      3.25      2.76     1.07     36.83  (0 px differ)
+cpu_sah_full            196.7     195.7     197.3    186.32      0.00      2.03      3.48      2.71     1.56     36.49  (0 px differ)
+gpu_lbvh                 10.6      10.5      11.1      0.41      1.54      0.00      3.63      2.63     2.25     43.37  (0 px differ)
+gpu_lbvh+prbvh           18.3      18.1      18.3      8.64      1.55      0.00      3.31      2.50     2.20     37.46  (0 px differ)
+gpu_ploc                 14.1      13.9      14.2      3.26      1.88      0.00      3.78      2.53     2.70     41.00  (0 px differ)
+gpu_ploc+prbvh           22.5      22.0      23.2     12.21      1.97      0.00      3.26      2.58     2.53     37.20  (0 px differ)
+gpu_hploc                10.8      10.5      11.1      0.71      1.52      0.00      3.68      2.60     2.31     40.57  (0 px differ)
+gpu_hploc+prbvh          19.7      19.3      21.7      9.92      1.60      0.00      3.52      2.74     2.33     37.08  (1 px differ)
+gpu_trbvh                15.8      14.7      16.1      5.69      1.59      0.00      3.47      2.54     2.49     38.43  (0 px differ)
+gpu_trbvh+prbvh          23.5      22.0      24.1     14.00      1.50      0.00      3.20      2.52     2.04     36.89  (0 px differ)
+
+>>> bunny 16 AO
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (30 ms)
+E2E bench: bunny, 69451 tris, 1920x1080, 16 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                  70.9      70.4      72.5     55.18      0.00      1.89     10.12      2.66     1.04     36.83  (0 px differ)
+cpu_sah_full            202.5     201.8     202.9    186.87      0.00      2.04      9.74      2.71     1.56     36.49  (0 px differ)
+gpu_lbvh                 18.1      18.0      18.5      0.40      1.53      0.00     11.44      2.74     2.18     43.37  (0 px differ)
+gpu_lbvh+prbvh           25.4      24.2      25.7      8.60      1.54      0.00     10.17      2.53     2.24     37.46  (0 px differ)
+gpu_ploc                 21.6      21.2      21.6      3.04      1.95      0.00     11.50      2.56     2.51     41.00  (0 px differ)
+gpu_ploc+prbvh           30.0      29.2      31.1     12.50      1.84      0.00     10.12      2.73     2.59     37.20  (0 px differ)
+gpu_hploc                18.8      18.3      18.8      0.70      1.70      0.00     11.50      2.53     2.19     40.57  (0 px differ)
+gpu_hploc+prbvh          26.6      26.4      26.8      9.75      1.59      0.00      9.97      2.55     2.43     37.08  (1 px differ)
+gpu_trbvh                21.9      21.8      22.7      5.57      1.50      0.00     10.25      2.56     2.15     38.43  (0 px differ)
+gpu_trbvh+prbvh          30.1      29.6      30.5     13.91      1.52      0.00      9.92      2.55     1.91     36.89  (0 px differ)
+
+>>> bunny 64 AO
+Loaded data\bun_zipper.ply: 35947 vertices, 69451 triangles (29 ms)
+E2E bench: bunny, 69451 tris, 1920x1080, 64 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                  98.0      97.5      98.0     55.42      0.00      2.02     37.23      2.58     1.08     36.83  (0 px differ)
+cpu_sah_full            229.8     227.7     234.4    187.05      0.00      1.87     36.38      2.57     1.55     36.49  (0 px differ)
+gpu_lbvh                 50.2      50.1      50.9      0.40      1.57      0.00     43.50      2.50     2.33     43.37  (0 px differ)
+gpu_lbvh+prbvh           53.5      53.3      53.9      8.60      1.63      0.00     38.50      2.59     2.24     37.46  (0 px differ)
+gpu_ploc                 52.7      52.2      53.0      3.32      1.89      0.00     42.39      2.36     2.62     41.00  (0 px differ)
+gpu_ploc+prbvh           57.3      56.5      58.1     12.00      1.94      0.00     38.03      2.59     2.83     37.20  (0 px differ)
+gpu_hploc                49.6      48.4      49.9      0.74      1.66      0.00     42.33      2.46     2.27     40.57  (0 px differ)
+gpu_hploc+prbvh          54.5      54.1      54.9     10.12      1.67      0.00     37.54      2.43     2.78     37.08  (1 px differ)
+gpu_trbvh                50.9      49.8      51.7      5.79      1.57      0.00     38.86      2.46     2.24     38.43  (0 px differ)
+gpu_trbvh+prbvh          57.9      57.5      58.0     14.45      1.72      0.00     36.95      2.52     2.17     36.89  (0 px differ)
+
+>>> dragon 4 AO
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (286 ms)
+E2E bench: dragon, 871414 tris, 1920x1080, 4 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                 789.0     788.6     796.5    757.09      0.00     14.10      7.95      2.66     7.02     57.50  (0 px differ)
+cpu_sah_full           3861.3    3726.3    3869.4   3639.26      0.00     20.92    187.82      2.74    12.55     56.75  (0 px differ)
+gpu_lbvh                 37.4      36.8      39.3      5.55     12.14      0.00     13.41      2.62     4.65     70.02  (1 px differ)
+gpu_lbvh+prbvh          171.3     160.7     171.4    143.26     11.14      0.00      7.72      2.55     3.90     58.14  (2 px differ)
+gpu_ploc                 39.9      38.0      40.7     11.98     10.64      0.00      8.31      2.56     4.81     63.62  (1 px differ)
+gpu_ploc+prbvh          193.6     192.8     202.1    167.11     10.64      0.00      7.20      2.56     5.56     57.20  (1 px differ)
+gpu_hploc                30.4      30.3      32.4      7.10      9.13      0.00      7.56      2.37     4.32     63.12  (1 px differ)
+gpu_hploc+prbvh         164.9     164.4     168.5    140.71      9.12      0.00      6.78      2.31     6.15     57.10  (1 px differ)
+gpu_trbvh                69.3      68.7      70.7     46.56      8.74      0.00      7.01      2.34     4.13     60.52  (1 px differ)
+gpu_trbvh+prbvh         173.4     170.4     177.3    151.51      8.87      0.00      6.58      2.38     3.97     56.66  (1 px differ)
+
+>>> dragon 16 AO
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (278 ms)
+E2E bench: dragon, 871414 tris, 1920x1080, 16 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                 808.4     807.8     808.5    760.08      0.00     13.98     24.39      2.36     7.28     57.50  (0 px differ)
+cpu_sah_full           3938.8    3800.9    3976.3   3634.63      0.00     15.23    284.78      2.70    12.46     56.75  (0 px differ)
+gpu_lbvh                 58.4      57.9      64.8      4.50     10.94      0.00     35.20      2.61     4.31     70.02  (1 px differ)
+gpu_lbvh+prbvh          170.4     157.4     176.2    131.63     10.57      0.00     23.00      2.35     4.03     58.14  (2 px differ)
+gpu_ploc                 54.8      51.6      58.4     12.24     10.55      0.00     24.67      2.79     4.61     63.62  (1 px differ)
+gpu_ploc+prbvh          203.1     203.0     206.0    165.55     10.45      0.00     19.63      2.42     4.98     57.20  (1 px differ)
+gpu_hploc                45.3      44.7      45.9      7.13      9.07      0.00     22.04      2.44     4.10     63.12  (1 px differ)
+gpu_hploc+prbvh         182.0     178.5     197.6    144.22      9.09      0.00     19.81      2.37     6.24     57.10  (1 px differ)
+gpu_trbvh                90.4      83.8      97.6     53.68      8.92      0.00     21.04      2.46     4.31     60.52  (1 px differ)
+gpu_trbvh+prbvh         215.6     185.2     217.4    175.68      9.10      0.00     23.62      2.42     4.02     56.66  (1 px differ)
+
+>>> dragon 64 AO
+Loaded data\dragon_vrip.ply: 437645 vertices, 871414 triangles (288 ms)
+E2E bench: dragon, 871414 tris, 1920x1080, 64 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                 858.1     846.5     865.4    752.25      0.00     13.31     87.03      2.41     7.44     57.50  (0 px differ)
+cpu_sah_full           4041.0    4032.8    4060.6   3628.14      0.00     20.94    382.31      2.29    12.72     56.75  (0 px differ)
+gpu_lbvh                124.5     124.3     124.7      4.95      9.14      0.00    103.78      2.55     4.27     70.02  (1 px differ)
+gpu_lbvh+prbvh          236.7     202.1     237.2    133.34      8.90      0.00     87.82      2.69     3.63     58.14  (2 px differ)
+gpu_ploc                127.5     110.3     128.3     12.55     10.67      0.00     96.96      2.50     5.01     63.62  (1 px differ)
+gpu_ploc+prbvh          302.2     299.1     302.7    196.80     10.80      0.00     86.43      2.46     5.33     57.20  (1 px differ)
+gpu_hploc               120.1     119.5     121.4      8.21      9.15      0.00     96.15      2.40     4.12     63.12  (1 px differ)
+gpu_hploc+prbvh         274.6     233.3     275.1    168.83      9.11      0.00     87.56      2.18     6.28     57.10  (1 px differ)
+gpu_trbvh               146.2     136.7     162.0     46.99      8.93      0.00     81.87      2.59     4.01     60.52  (1 px differ)
+gpu_trbvh+prbvh         266.6     240.4     276.5    166.43      8.86      0.00     84.46      2.37     3.79     56.66  (1 px differ)
+
+>>> buddha 4 AO
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (357 ms)
+E2E bench: buddha, 1087716 tris, 1920x1080, 4 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                 951.4     944.0     954.1    915.14      0.00     16.63      8.30      2.39     8.82     65.25  (0 px differ)
+cpu_sah_full           4820.4    4807.4    4832.6   4567.79      0.00     26.33    223.36      2.75    15.52     64.48  (1 px differ)
+gpu_lbvh                 42.6      41.9      45.1      7.49     14.08      0.00     13.18      2.55     4.87     83.73  (1 px differ)
+gpu_lbvh+prbvh          205.3     191.3     213.0    176.64     14.19      0.00      7.38      2.52     4.84     67.79  (1 px differ)
+gpu_ploc                 46.4      44.1      47.3     14.98     13.50      0.00      9.45      2.54     5.79     72.50  (1 px differ)
+gpu_ploc+prbvh          273.4     245.5     285.4    242.86     13.26      0.00      8.33      2.41     6.24     65.04  (2 px differ)
+gpu_hploc                39.5      39.1      40.2     11.10     11.54      0.00      9.96      2.27     4.97     72.66  (1 px differ)
+gpu_hploc+prbvh         246.3     240.2     247.4    215.98     11.45      0.00      8.42      2.21     7.40     65.37  (1 px differ)
+gpu_trbvh                97.3      96.8      97.5     70.26     11.05      0.00      8.79      2.32     4.60     68.64  (2 px differ)
+gpu_trbvh+prbvh         251.7     251.5     252.1    225.38     11.04      0.00      8.02      2.37     4.80     64.01  (2 px differ)
+
+>>> buddha 16 AO
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (358 ms)
+E2E bench: buddha, 1087716 tris, 1920x1080, 16 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                 966.3     959.7     976.5    914.38      0.00     16.81     23.69      2.45     8.79     65.25  (0 px differ)
+cpu_sah_full           4782.2    4755.9    4836.8   4564.67      0.00     26.47    163.88      3.00    16.03     64.48  (1 px differ)
+gpu_lbvh                 70.1      69.7      70.5      7.40     14.13      0.00     41.26      2.64     4.84     83.73  (1 px differ)
+gpu_lbvh+prbvh          219.5     217.0     220.0    174.91     11.21      0.00     24.77      2.60     4.75     67.79  (1 px differ)
+gpu_ploc                 65.9      64.0      65.9     15.64     13.52      0.00     27.70      2.55     5.57     72.50  (1 px differ)
+gpu_ploc+prbvh          300.2     256.9     302.5    253.68     13.57      0.00     23.89      2.27     6.47     65.04  (2 px differ)
+gpu_hploc                56.3      51.7      57.8      9.77     11.69      0.00     26.51      2.43     5.44     72.66  (1 px differ)
+gpu_hploc+prbvh         264.5     226.6     264.9    217.42     11.53      0.00     24.07      2.46     8.13     65.37  (1 px differ)
+gpu_trbvh               114.3     113.7     115.8     70.21     11.17      0.00     25.06      2.61     5.21     68.64  (2 px differ)
+gpu_trbvh+prbvh         267.6     258.4     267.7    224.51     11.46      0.00     24.24      2.24     4.89     64.01  (2 px differ)
+
+>>> buddha 64 AO
+Loaded data\happy_vrip.ply: 543652 vertices, 1087716 triangles (355 ms)
+E2E bench: buddha, 1087716 tris, 1920x1080, 64 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                1036.5    1035.2    1037.1    920.51      0.00     17.23     87.45      2.48     8.76     65.25  (0 px differ)
+cpu_sah_full           4846.7    4846.4    4853.0   4555.51      0.00     26.07    246.48      2.52    15.32     64.48  (1 px differ)
+gpu_lbvh                139.0     137.5     139.2      5.76     11.53      0.00    113.61      2.45     5.59     83.73  (1 px differ)
+gpu_lbvh+prbvh          285.6     284.7     286.2    174.59     11.17      0.00     91.97      2.36     5.06     67.79  (1 px differ)
+gpu_ploc                137.8     137.6     138.1     15.43     13.27      0.00    100.26      2.38     6.16     72.50  (1 px differ)
+gpu_ploc+prbvh          367.3     364.5     367.7    256.18     13.40      0.00     88.44      2.45     6.44     65.04  (2 px differ)
+gpu_hploc               129.8     128.7     130.1      9.92     11.52      0.00     99.90      2.24     4.82     72.66  (1 px differ)
+gpu_hploc+prbvh         303.5     294.2     311.5    208.93     11.47      0.00     72.96      2.31     7.63     65.37  (1 px differ)
+gpu_trbvh               153.5     152.8     153.7     59.22     11.11      0.00     76.27      2.24     4.46     68.64  (2 px differ)
+gpu_trbvh+prbvh         282.7     278.9     284.2    190.55     11.02      0.00     70.29      2.33     4.90     64.01  (2 px differ)
+
+>>> mixed 4 AO
+Mixed-size scene: 546647 vertices, 1081503 triangles (341 ms)
+E2E bench: mixed, 1081503 tris, 1920x1080, 4 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                1004.0     999.9    1014.0    972.17      0.00     15.97      7.23      2.36     8.92     21.28  (0 px differ)
+cpu_sah_full           5432.3    5376.6    5492.3   5278.39      0.00     26.36     93.32      2.36    15.87     19.16  (2 px differ)
+gpu_lbvh                 46.7      46.4      48.5      6.44     13.95      0.00     17.88      2.31     5.03     34.94  (1 px differ)
+gpu_lbvh+prbvh          219.7     219.2     229.1    193.51     13.87      0.00      7.75      2.37     5.06     18.22  (2 px differ)
+gpu_ploc                 46.2      42.8      46.2     15.55     13.47      0.00      8.68      2.29     5.79     22.74  (1 px differ)
+gpu_ploc+prbvh          272.9     233.2     273.9    243.96     13.73      0.00      6.84      2.17     6.22     16.85  (1 px differ)
+gpu_hploc                37.4      35.3      37.7      9.60     11.61      0.00      8.60      2.32     5.08     23.34  (2 px differ)
+gpu_hploc+prbvh         247.4     213.6     249.0    218.03     11.59      0.00      5.83      2.51     7.95     17.18  (2 px differ)
+gpu_trbvh                96.3      92.9      96.3     69.24     11.27      0.00      8.05      2.48     4.97     19.78  (2 px differ)
+gpu_trbvh+prbvh         260.7     229.4     262.8    235.09     11.16      0.00      6.91      2.60     5.00     16.26  (2 px differ)
+
+>>> mixed 16 AO
+Mixed-size scene: 546647 vertices, 1081503 triangles (330 ms)
+E2E bench: mixed, 1081503 tris, 1920x1080, 16 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                1007.2    1005.1    1019.4    960.00      0.00     16.79     21.23      2.34     8.86     21.28  (0 px differ)
+cpu_sah_full           5471.8    5456.3    5492.7   5274.49      0.00     41.04    138.20      2.61    15.50     19.16  (2 px differ)
+gpu_lbvh                 71.8      66.2      73.0      6.08     13.96      0.00     44.94      2.30     4.78     34.94  (1 px differ)
+gpu_lbvh+prbvh          233.4     202.8     233.9    190.82     11.11      0.00     22.89      2.16     5.08     18.22  (2 px differ)
+gpu_ploc                 62.9      62.8      62.9     15.42     13.37      0.00     25.60      2.32     6.10     22.74  (1 px differ)
+gpu_ploc+prbvh          289.4     285.7     289.5    245.52     13.51      0.00     21.32      2.50     6.30     16.85  (1 px differ)
+gpu_hploc                54.9      53.8      55.4      9.76     11.61      0.00     24.92      2.67     4.90     23.34  (2 px differ)
+gpu_hploc+prbvh         263.3     263.1     263.5    221.01     11.74      0.00     19.67      2.57     7.81     17.18  (2 px differ)
+gpu_trbvh               113.0     112.0     113.4     69.67     11.52      0.00     24.14      2.36     4.92     19.78  (2 px differ)
+gpu_trbvh+prbvh         275.8     241.8     276.4    236.24     11.47      0.00     20.86      2.48     4.89     16.26  (2 px differ)
+
+>>> mixed 64 AO
+Mixed-size scene: 546647 vertices, 1081503 triangles (339 ms)
+E2E bench: mixed, 1081503 tris, 1920x1080, 64 AO, gpu_bvh_opt, 5 runs (round-robin)
+
+builder              total ms       p25       p75     build   mesh up   tree up    render      down    other       SAH
+cpu_sah                1078.1    1060.4    1080.7    971.56      0.00     16.74     77.51      2.31     8.79     21.28  (0 px differ)
+cpu_sah_full           5524.8    5512.6    5598.0   5261.90      0.00     41.26    191.03      2.35    15.41     19.16  (2 px differ)
+gpu_lbvh                172.9     166.5     173.7      5.76     11.05      0.00    149.10      2.36     4.85     34.94  (1 px differ)
+gpu_lbvh+prbvh          296.1     255.7     296.3    192.11     11.24      0.00     84.97      2.27     4.95     18.22  (2 px differ)
+gpu_ploc                135.0     116.4     135.6     15.65     13.61      0.00     97.41      2.38     5.73     22.74  (1 px differ)
+gpu_ploc+prbvh          344.4     300.0     344.6    243.69     13.45      0.00     77.87      2.33     5.96     16.85  (1 px differ)
+gpu_hploc               121.2     104.5     122.3      9.30     11.38      0.00     92.77      2.30     4.95     23.34  (2 px differ)
+gpu_hploc+prbvh         317.7     272.2     318.6    219.28     11.58      0.00     75.85      2.43     7.95     17.18  (2 px differ)
+gpu_trbvh               179.0     178.0     179.0     69.56     11.36      0.00     90.69      2.40     4.62     19.78  (2 px differ)
+gpu_trbvh+prbvh         332.5     304.1     333.3    237.35     11.26      0.00     76.50      2.40     4.95     16.26  (2 px differ)
+
+wrote results\e2e.csv; plot with: py scripts\plot_build.py

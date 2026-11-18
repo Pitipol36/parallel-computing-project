@@ -1,0 +1,16 @@
+<section id="gpu-e2e" data-transition="fade" style="background:#FCFCFB;color:#1B2233;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:28px">
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#10172A">Total time to the first image</h2>
+<img src="/_blob/25969bb805976ae4ba73f9ed977c0901" alt="Two stacked horizontal bar charts, dragon and mixed scene at 1080p with 16 AO, of the time from mesh in RAM to image in RAM split into build, mesh upload, tree upload, render, image download and allocations. Dragon: H-PLOC 45 ms, PLOC 55, LBVH 58, TRBVH 90, the PRBVH variants 170 to 216 ms, binned CPU SAH 808 ms, full CPU SAH 3,939 ms. Mixed: H-PLOC 55 ms, PLOC 63, LBVH 72, TRBVH 113, PRBVH variants 233 to 289 ms, binned SAH 1,007 ms, full SAH 5,472 ms" style="width:1664px;height:520px;object-fit:contain">
+<div style="display:flex;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#10172A;padding:28px 32px;border-radius:16px">
+<p style="font-size:32px;font-weight:600;line-height:1.3;color:#F28A5E">H-PLOC: 18× sooner than the CPU</p>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">45 vs 808 ms on the dragon, 55 vs 1,007 ms on the mixed scene. Fastest on all three 1M-triangle models at 4, 16 and 64 AO.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#F1F0EC;padding:28px 32px;border-radius:16px">
+<p style="font-size:32px;font-weight:600;line-height:1.3;color:#10172A">For one image, skip PRBVH</p>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">It adds 120–240 ms of build and saves at most 64 ms of render. Fixed costs (mesh upload, allocations, download): 16–19 ms.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">25 · One wall clock, mesh in RAM → image in RAM, gpu_bvh_opt render. Median of 5 interleaved runs; the GPU is woken before each run.</p>
+<aside>So far I timed the build and the render separately. Here is one stopwatch from start to finish: the mesh is in main memory, and the clock stops when the finished image is back in main memory. That includes uploading the mesh, every allocation, the build, the render with the optimized kernel, downloading the image and freeing the memory. H-PLOC gets to the first image fastest: 45 milliseconds on the dragon, against 808 for the CPU SAH build, which is 18 times sooner, and the same on the mixed scene. On all three million-triangle models it stays fastest at 4, 16 and 64 AO samples; only on the small bunny is the LBVH a little quicker. The fixed costs, uploading the mesh, allocating and downloading, add up to 16 to 19 milliseconds, which is more than H-PLOC's build itself. Parallel reinsertion does not pay for a single image: it adds 120 to 240 milliseconds of build and saves at most 64 milliseconds of render even at 64 AO. It pays off when the same tree is used for many frames. One more effect: during a several-second CPU build the GPU clocks down, so the first render after the full-sweep build is several times slower than normal. I woke the GPU before every timed run so that no builder pays for the one before it.</aside>
+</section>

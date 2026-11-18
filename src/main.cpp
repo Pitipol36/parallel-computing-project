@@ -49,6 +49,8 @@ struct Options {
     std::string buildCsv;
     std::string statsCsv;
     bool qualityBench = false;
+    bool e2eBench = false;
+    std::string e2eCsv;
     bool dynamic = false;
     int frames = 60;
     std::string dynamicCsv;
@@ -90,6 +92,10 @@ void usage() {
         "  --build-bench       time each --build builder (--warmup/--runs, median per stage),\n"
         "                      print tree quality, append to --build-csv; no rendering\n"
         "  --build-csv FILE    CSV for --build-bench rows (default results/build.csv)\n"
+        "  --e2e-bench         total time to image per --build builder: mesh in host memory ->\n"
+        "                      build (+ uploads, allocations) -> gpu_bvh_opt render -> image on\n"
+        "                      the host, one wall clock; builders interleaved; <builder>+prbvh adds\n"
+        "                      PRBVH to one entry; appends to --e2e-csv (default results/e2e.csv)\n"
         "  --quality-bench     render every --build builder's tree with every --mode, warm-up\n"
         "                      first, runs interleaved round-robin; median + IQR to --csv\n"
         "  --stats-csv FILE    append traversal counters per mode (RT_TRAVERSAL_STATS builds only)\n"
@@ -183,6 +189,8 @@ bool parse_args(int argc, char** argv, Options& o) {
         else if (a == "--build") o.builders = split(next(), ',');
         else if (a == "--build-bench") o.buildBench = true;
         else if (a == "--quality-bench") o.qualityBench = true;
+        else if (a == "--e2e-bench") o.e2eBench = true;
+        else if (a == "--e2e-csv") o.e2eCsv = next();
         else if (a == "--build-csv") o.buildCsv = next();
         else if (a == "--stats-csv") o.statsCsv = next();
         else if (a == "--dynamic") o.dynamic = true;
@@ -205,10 +213,13 @@ bool parse_args(int argc, char** argv, Options& o) {
     o.modes = expanded;
     for (const std::string& b : o.builders) {
         BuilderKind bk;
-        if (!parse_builder(b, bk)) { std::fprintf(stderr, "unknown builder %s\n", b.c_str()); return false; }
+        std::string name = b;
+        const bool plus = o.e2eBench && name.size() > 6 && name.compare(name.size() - 6, 6, "+prbvh") == 0;
+        if (plus) name.resize(name.size() - 6);  // --e2e-bench: "<builder>+prbvh" adds PRBVH to that one
+        if (!parse_builder(name, bk)) { std::fprintf(stderr, "unknown builder %s\n", b.c_str()); return false; }
     }
     if (o.builders.empty()) o.builders = {"cpu_sah"};
-    if (o.builders.size() > 1 && !o.buildBench && !o.qualityBench) {
+    if (o.builders.size() > 1 && !o.buildBench && !o.qualityBench && !o.e2eBench) {
         std::fprintf(stderr, "--build takes one builder unless --build-bench or --quality-bench is given\n");
         return false;
     }
@@ -513,6 +524,149 @@ int run_quality_bench(const Options& o) {
                     << "," << median(e2e[b * M + m]) << "," << median(up[b * M + m]) << ","
                     << median(down[b * M + m]) << "," << rays / (k * 1e3) << "," << p25 << "," << p75 << "\n";
         }
+    return 0;
+}
+
+// ---------------------------------------------------------------- end-to-end benchmark
+
+// One wall clock from "mesh in host memory" to "image in host memory", per builder:
+//   GPU builders: mesh upload + allocations + build + gpu_bvh_opt render of the resident tree +
+//                 image download + freeing the tree;
+//   CPU builders: build on the CPU + tree/triangle upload + render + download + frees.
+// Builders run round-robin after a warm-up round, so drift hits all of them alike.
+int run_e2e_bench(const Options& o) {
+    Mesh mesh;
+    if (!load_scene(o.model, mesh)) return 1;
+    std::string label = o.label.empty() ? (o.model.empty() ? "testscene" : fs::path(o.model).stem().string()) : o.label;
+    std::string gdesc;
+    size_t freeB = 0, totalB = 0;
+    if (!gpu_info(gdesc, freeB, totalB)) { std::fprintf(stderr, "no CUDA device\n"); return 1; }
+    ShadeParams sp = make_shade_params(mesh.bounds(), o.rp);
+    const size_t B = o.builders.size();
+    struct Entry {
+        std::string name;
+        BuilderKind kind;
+        BuildParams bp;
+        bool gpu;
+        double sah = 0;
+        std::vector<double> total, build, meshUp, treeUp, render, down, other;
+        std::vector<uint32_t> image;
+    };
+    std::vector<Entry> es(B);
+    for (size_t b = 0; b < B; ++b) {
+        Entry& e = es[b];
+        e.name = o.builders[b];
+        std::string base = e.name;
+        e.bp = o.bp;
+        if (base.size() > 6 && base.compare(base.size() - 6, 6, "+prbvh") == 0) {
+            base.resize(base.size() - 6);
+            if (e.bp.prbvhIters <= 0) e.bp.prbvhIters = 8;
+        }
+        e.kind = builder_of(base);
+        e.gpu = e.kind == BuilderKind::GpuLbvh || e.kind == BuilderKind::GpuTrbvh || e.kind == BuilderKind::GpuPloc ||
+                e.kind == BuilderKind::GpuHploc;
+        // Tree quality, outside the timed runs.
+        BVH t;
+        BuildReport br;
+        std::string err;
+        if (!build_with(e.kind, mesh, e.bp, t, br, err)) {
+            std::fprintf(stderr, "build failed (%s): %s\n", e.name.c_str(), err.c_str());
+            return 1;
+        }
+        e.sah = tree_stats(t).sahCost;
+    }
+    std::printf("E2E bench: %s, %zu tris, %dx%d, %d AO, gpu_bvh_opt, %d runs (round-robin)\n", label.c_str(),
+                mesh.faces.size(), o.rp.width, o.rp.height, o.rp.aoSamples, o.runs);
+
+    auto run_one = [&](Entry& e, bool record) -> bool {
+        std::string err;
+        std::vector<uint32_t> pixels;
+        GpuTimings tm;
+        BuildReport rep;
+        double buildMs = 0, meshUp = 0, treeUp = 0;
+        const auto t0 = Clock::now();
+        if (e.gpu) {
+            DeviceBvh dev;
+            bool ok = false;
+            switch (e.kind) {
+                case BuilderKind::GpuLbvh: ok = build_lbvh_gpu(mesh, e.bp, nullptr, &dev, &rep, err, false); break;
+                case BuilderKind::GpuTrbvh: ok = build_lbvh_gpu(mesh, e.bp, nullptr, &dev, &rep, err, true); break;
+                case BuilderKind::GpuPloc: ok = build_ploc_gpu(mesh, e.bp, nullptr, &dev, &rep, err); break;
+                default: ok = build_hploc_gpu(mesh, e.bp, nullptr, &dev, &rep, err); break;
+            }
+            if (!ok) { std::fprintf(stderr, "%s: %s\n", e.name.c_str(), err.c_str()); return false; }
+            ok = render_gpu_resident(dev, GpuMode::BvhOpt, sp, o.launch, pixels, nullptr, tm, err);
+            dev.release();
+            if (!ok) { std::fprintf(stderr, "%s render: %s\n", e.name.c_str(), err.c_str()); return false; }
+            buildMs = rep.buildMs;
+            meshUp = rep.uploadMs;
+        } else {
+            BVH t;
+            if (!build_with(e.kind, mesh, e.bp, t, rep, err)) {
+                std::fprintf(stderr, "%s: %s\n", e.name.c_str(), err.c_str());
+                return false;
+            }
+            buildMs = rep.buildMs;
+            if (!render_gpu(t, mesh, GpuMode::BvhOpt, sp, o.launch, pixels, nullptr, tm, err)) {
+                std::fprintf(stderr, "%s render: %s\n", e.name.c_str(), err.c_str());
+                return false;
+            }
+            treeUp = tm.uploadMs;
+        }
+        const double total = ms_since(t0);
+        if (record) {
+            e.total.push_back(total);
+            e.build.push_back(buildMs);
+            e.meshUp.push_back(meshUp);
+            e.treeUp.push_back(treeUp);
+            e.render.push_back(tm.kernelMs);
+            e.down.push_back(tm.downloadMs);
+            e.other.push_back(total - buildMs - meshUp - treeUp - tm.kernelMs - tm.downloadMs);
+            if (e.image.empty()) e.image = pixels;
+        }
+        return true;
+    };
+    // Before every timed run, an untimed GPU LBVH build + render wakes the GPU up: otherwise the
+    // builder that follows a long CPU build starts with the GPU clocked down and pays for its
+    // predecessor. (A CPU builder's own idle GPU during its build stays in its time: that is real.)
+    Entry waker;
+    waker.name = "gpu_lbvh (wake)";
+    waker.kind = BuilderKind::GpuLbvh;
+    waker.bp = o.bp;
+    waker.bp.prbvhIters = 0;
+    waker.gpu = true;
+    for (int w = 0; w < std::max(1, o.warmup); ++w)
+        for (Entry& e : es)
+            if (!run_one(e, false)) return 1;
+    for (int r = 0; r < o.runs; ++r)
+        for (Entry& e : es) {
+            if (!run_one(waker, false) || !run_one(e, true)) return 1;
+        }
+
+    const std::string csvPath = o.e2eCsv.empty() ? "results/e2e.csv" : o.e2eCsv;
+    const bool exists = fs::exists(csvPath);
+    if (fs::path(csvPath).has_parent_path()) fs::create_directories(fs::path(csvPath).parent_path());
+    std::ofstream csv(csvPath, std::ios::app);
+    if (!exists)
+        csv << "experiment,model,tris,width,height,ao,builder,prbvh_iters,runs,total_ms,p25_ms,p75_ms,build_ms,"
+               "mesh_upload_ms,tree_upload_ms,render_ms,download_ms,other_ms,sah_cost,diff_pixels\n";
+    std::printf("\n%-18s %10s %9s %9s %9s %9s %9s %9s %9s %8s %9s\n", "builder", "total ms", "p25", "p75", "build",
+                "mesh up", "tree up", "render", "down", "other", "SAH");
+    for (Entry& e : es) {
+        // Pixels that differ from the first builder's image (the closest hit does not depend on the BVH;
+        // only fused-multiply-add rounding on triangle edges can change a pixel).
+        size_t diff = 0;
+        for (size_t i = 0; i < e.image.size() && i < es[0].image.size(); ++i) diff += e.image[i] != es[0].image[i];
+        const double tot = median(e.total);
+        std::printf("%-18s %10.1f %9.1f %9.1f %9.2f %9.2f %9.2f %9.2f %9.2f %8.2f %9.2f  (%zu px differ)\n",
+                    e.name.c_str(), tot, quantile(e.total, 0.25), quantile(e.total, 0.75), median(e.build),
+                    median(e.meshUp), median(e.treeUp), median(e.render), median(e.down), median(e.other), e.sah, diff);
+        csv << o.tag << "," << label << "," << mesh.faces.size() << "," << o.rp.width << "," << o.rp.height << ","
+            << o.rp.aoSamples << "," << e.name << "," << e.bp.prbvhIters << "," << e.total.size() << "," << tot << ","
+            << quantile(e.total, 0.25) << "," << quantile(e.total, 0.75) << "," << median(e.build) << ","
+            << median(e.meshUp) << "," << median(e.treeUp) << "," << median(e.render) << "," << median(e.down) << ","
+            << median(e.other) << "," << e.sah << "," << diff << "\n";
+    }
     return 0;
 }
 
@@ -933,5 +1087,6 @@ int main(int argc, char** argv) {
     if (o.verify) return run_verify(o);
     if (o.dynamic) return run_dynamic(o);
     if (o.qualityBench) return run_quality_bench(o);
+    if (o.e2eBench) return run_e2e_bench(o);
     return o.buildBench ? run_build_bench(o) : run_benchmark(o);
 }

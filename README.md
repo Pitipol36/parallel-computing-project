@@ -498,6 +498,10 @@ build/raytracer --model data/dragon_vrip.ply --build-bench --build gpu_hploc,gpu
 powershell -ExecutionPolicy Bypass -File scripts
 un_prbvh_benchmarks.ps1
 
+# Total time to image: mesh in RAM -> build -> gpu_bvh_opt render -> image in RAM, per builder
+build/raytracer --model data/dragon_vrip.ply --e2e-bench --build cpu_sah,gpu_lbvh,gpu_hploc,gpu_hploc+prbvh --ao 16
+powershell -ExecutionPolicy Bypass -File scripts\run_e2e_benchmarks.ps1
+
 # Box/triangle tests per ray need the counting build (never use it for timing)
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -Stats
 build-stats/raytracer --model data/dragon_vrip.ply --build gpu_hploc --mode gpu_bvh_opt
@@ -692,6 +696,34 @@ the PRBVH trees and the CPU SAH trees rendered interleaved in one run (11 GPU ru
 * **So PRBVH's large render gains are on weak trees** (LBVH: −27 % on the dragon, −42 % on the
   mixed scene). Near 100 %, further SAH gains buy little or no render time.
 
+**Total time to the first image** (`results/e2e.csv`, `e2e_breakdown.png`, `e2e_vs_ao.png`,
+`scripts/run_e2e_benchmarks.ps1`, `--e2e-bench`):
+* **The clock:** one wall clock per run, from the mesh in host memory to the image in host
+  memory. It covers mesh upload, every allocation and free, the build, the tree upload (CPU
+  builders), the `gpu_bvh_opt` render at 1080p and the image download. Loading the PLY file is
+  not included.
+* **Runs:** builders are interleaved round-robin, median of 5 runs.
+* **GPU wake-up:** before each timed run an untimed LBVH build and render wakes the GPU. Without
+  it, the builder after a multi-second CPU build started with the GPU clocked down: LBVH measured
+  119 ms instead of 37 ms on the dragon.
+* **Same image:** every builder renders the same image (at most 2 pixels differ, on triangle edges).
+
+| 16 AO, total ms | binned SAH | full SAH | LBVH | PLOC | H-PLOC | TRBVH | LBVH + PRBVH | H-PLOC + PRBVH | TRBVH + PRBVH |
+|---|---|---|---|---|---|---|---|---|---|
+| dragon | 808 | 3,939 | 58 | 55 | **45** | 90 | 170 | 182 | 216 |
+| buddha | 966 | 4,782 | 70 | 66 | **56** | 114 | 220 | 265 | 268 |
+| mixed | 1,007 | 5,472 | 72 | 63 | **55** | 113 | 233 | 263 | 276 |
+
+* **H-PLOC reaches the first image fastest** on all three big models at 4, 16 and 64 AO: 18×
+  sooner than the binned CPU SAH build at 16 AO. On the bunny the LBVH is slightly quicker at 4 and
+  16 AO.
+* **Fixed costs** are 16–19 ms on the big models: mesh upload 9–14 ms, allocations and frees
+  4–8 ms, image download 2.4 ms. That is more than H-PLOC's whole build (7–10 ms).
+* **PRBVH does not pay for one image:** on the big models it adds 120–240 ms of build and saves at
+  most 64 ms of render, even at 64 AO.
+* **The CPU builders' render is slow too:** after the 3.6–5.3 s full sweep it takes 140–380 ms
+  instead of ~25 ms. The GPU clocks down while it waits for the CPU, and that cost is real.
+
 **Dynamic scene** (`dynamic_refit_vs_rebuild.png`, `explode.gif`): the dragon explodes over 60
 frames (1280×720, 4 AO); every triangle flies off in its own random direction.
 
@@ -769,9 +801,10 @@ src/       main.cpp (CLI), ply_loader.cpp, bvh_build.cpp (binned SAH), bvh_build
            code), camera.cpp, verify.cpp, image.cpp, mesh.cpp (+ procedural scenes)
 tests/     unit-test runner (procedural meshes only)
 scripts/   build.ps1 [-Stats], download_data.ps1/.sh, run_benchmarks.ps1/.sh, plot_results.py,
-           run_build_benchmarks.ps1, run_prbvh_benchmarks.ps1, plot_build.py
+           run_build_benchmarks.ps1, run_prbvh_benchmarks.ps1, run_e2e_benchmarks.ps1,
+           plot_build.py
 results/   results.csv, build.csv, build_render.csv, traversal.csv, dynamic.csv, prbvh.csv,
-           prbvh_render.csv, prbvh_vs_cpu_render.csv, prbvh_traversal.csv, v1/ (the
+           prbvh_render.csv, prbvh_vs_cpu_render.csv, prbvh_traversal.csv, e2e.csv, v1/ (the
            previous run) and plots/
 renders/   output images
 ```
