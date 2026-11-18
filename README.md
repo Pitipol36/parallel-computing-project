@@ -569,12 +569,15 @@ from the `-Stats` build at 1080p, 16 AO):
 
 * **The full-sweep reference** is only ~1 % better than binned SAH on the uniform scans, but
   **11 % better on the mixed scene**: binning hurts when triangle sizes vary.
-* **TRBVH beats the binned CPU SAH builder on the mixed scene** (103 % vs 111 % of full SAH;
-  27.8 vs 24.6 box tests per ray) while building 16× faster.
+* **On the mixed scene TRBVH has a lower SAH cost than the binned CPU SAH builder** (103 % vs
+  111 % of full SAH) while building 16× faster. It does **not** render faster: rays do more box
+  tests on it (27.8 vs 24.6 per ray), and its 1-thread render takes 5,052 vs 4,489 ms. SAH cost is
+  a model (see "SAH cost vs render time" below).
 * The mixed scene separates the builders far more than the scans do. The LBVH is at 182 %: its
   box tests per ray nearly double, and it renders 54 % slower than the reference.
-* **The quality order LBVH < PLOC ≈ H-PLOC < TRBVH < SAH holds on every model**, and the SAH cost
-  predicts the box tests per ray and the CPU render times.
+* **The quality order LBVH < PLOC ≈ H-PLOC < TRBVH < SAH holds on every model.** On the scans the
+  SAH cost also predicts the box tests per ray and the CPU render times. On the mixed scene it
+  does so for the GPU builders among themselves, but not against the CPU SAH trees.
 * On the procedural test scene (`--verify`), PLOC and H-PLOC are 11 % and TRBVH 14 % cheaper than
   binned SAH.
 * The GPU render medians (`gpu_bvh_opt`, with IQR bars in the chart) follow the same order, but
@@ -649,8 +652,8 @@ built back to back in the same run, % of the full-sweep SAH reference:
   106.9 → 104.6 → 102.3 → 100.6 % after 0, 1, 2, 4 and 8 rounds; 13 rounds converge at 100.3 %).
   Even 1–2 rounds (14–51 ms) recover half to two thirds of the gap. With no round limit the
   optimizer stops by itself after 13–19 rounds (0.01 % gain), at 99.6–100.9 %.
-* **Rendering** (1080p, 16 AO, `gpu_bvh_opt`, interleaved medians) gets faster with the better
-  trees:
+* **Rendering, each builder with and without PRBVH** (1080p, 16 AO, `gpu_bvh_opt`, interleaved
+  medians). The weaker the starting tree, the bigger the gain:
   - dragon: LBVH 29.0 → 21.0 ms (−27 %), PLOC 27.6 → 21.0 ms (−24 %), H-PLOC 27.4 → 20.8 ms
     (−24 %), TRBVH 25.4 → 20.4 ms (−20 %);
   - mixed: LBVH 35.1 → 20.3 ms (−42 %), PLOC 23.7 → 18.4 ms (−22 %), H-PLOC 22.3 → 18.1 ms
@@ -658,10 +661,36 @@ built back to back in the same run, % of the full-sweep SAH reference:
 
   At those rates the extra 110–210 ms pays for itself after about 11–15 frames for the LBVH and
   20–50 frames for the other builders.
-* **Against the CPU**: H-PLOC + PRBVH builds the dragon in 148 ms with a tree at 100.6 %. The
-  binned CPU SAH builder takes 769 ms for 101 %, and the full sweep 3.7 s for 100 %. The render
-  timings above come from the same run as the PRBVH builds, so they differ slightly from the
-  quality section's.
+* **Against the CPU**: H-PLOC + PRBVH builds the dragon in 148 ms with a tree at 100.6 % SAH
+  cost. The binned CPU SAH builder takes 769 ms for 101 %, and the full sweep 3.7 s for 100 %.
+  The render timings above come from the same run as the PRBVH builds, so they differ slightly
+  from the quality section's.
+
+**SAH cost vs render time** (`results/prbvh_vs_cpu_render.csv`, `results/prbvh_traversal.csv`):
+the PRBVH trees and the CPU SAH trees rendered interleaved in one run (11 GPU runs, median; one
+1-thread CPU run), with box tests from the `-Stats` build. 1080p, 16 AO:
+
+| Tree | SAH cost | Box tests / ray | GPU render | CPU render |
+|---|---|---|---|---|
+| mixed: binned SAH | 111 % | 24.6 | 17.2 ms | 4,416 ms |
+| mixed: full SAH | 100 % | 24.6 | 17.3 ms | 4,466 ms |
+| mixed: H-PLOC + PRBVH | 90 % | 22.3 | 17.0 ms | 4,244 ms |
+| mixed: TRBVH + PRBVH | 85 % | 22.4 | 17.0 ms | 4,254 ms |
+| dragon: full SAH | 100 % | 44.5 | **18.9 ms** | **2,586 ms** |
+| dragon: binned SAH | 101 % | 45.7 | 19.4 ms | 2,734 ms |
+| dragon: H-PLOC + PRBVH | 101 % | 46.0 | 19.5 ms | 2,863 ms |
+| dragon: TRBVH + PRBVH | 99.8 % | 44.6 | 19.2 ms | 2,720 ms |
+
+* **A lower SAH cost is not a faster render one-for-one.** On the mixed scene, 15 % lower SAH
+  cost gives 9 % fewer box tests but only a 5 % faster CPU render and a 2 % faster GPU render.
+* **On the dragon the full-sweep tree still renders fastest.** TRBVH + PRBVH has a slightly lower
+  SAH cost and the same box tests per ray, yet renders 2 % (GPU) and 5 % (CPU) slower.
+* **Why:** SAH assumes rays arrive uniformly from all directions and that every box and triangle
+  test costs the same. Here the camera sits low inside the mixed scene, shadow and AO rays stop
+  at their first hit, and the cost of a test depends on memory and cache behaviour. With equal
+  test counts on the dragon, the remaining gap is most likely per-test cost (not profiled).
+* **So PRBVH's large render gains are on weak trees** (LBVH: −27 % on the dragon, −42 % on the
+  mixed scene). Near 100 %, further SAH gains buy little or no render time.
 
 **Dynamic scene** (`dynamic_refit_vs_rebuild.png`, `explode.gif`): the dragon explodes over 60
 frames (1280×720, 4 AO); every triangle flies off in its own random direction.
@@ -688,13 +717,15 @@ disappears, while TRBVH stays within 1 % of the CPU SAH rebuild.
   than PLOC everywhere. The best middle ground on uniform meshes.
 * **GPU PLOC**: slightly better than H-PLOC on mixed sizes (119 % vs 122 %), but 1.4× slower to
   build.
-* **GPU TRBVH**: 5–7 % above the full-sweep reference on the scans and **better than the binned
-  CPU SAH builder on mixed sizes**, at 13–16× the CPU SAH build's speed. Best when a tree serves
+* **GPU TRBVH**: 5–7 % above the full-sweep reference on the scans and a lower SAH cost than the
+  binned CPU SAH builder on mixed sizes (though not a faster render), at 13–16× the CPU SAH
+  build's speed. Best when a tree serves
   many rays.
 * The binned CPU SAH tree only pays for its 0.77–0.99 s build after several hundred to a few
   thousand full-HD frames with the same tree.
 * **+ PRBVH** (any builder): 120–220 ms on 1M triangles for a tree at or below the full-sweep
-  reference. That is 4–7× faster than the binned CPU builder and 20–30× faster than the full sweep.
+  reference by SAH cost, and within ±3 % of the CPU SAH trees' GPU render time. That is 4–7×
+  faster than the binned CPU builder and 20–30× faster than the full sweep.
   Best when a tree serves more than a few dozen frames. 1–2 rounds are a cheaper middle setting.
 
 Lucy (28M triangles) was not available (only on the Stanford server, unreachable from here), so
@@ -740,7 +771,7 @@ tests/     unit-test runner (procedural meshes only)
 scripts/   build.ps1 [-Stats], download_data.ps1/.sh, run_benchmarks.ps1/.sh, plot_results.py,
            run_build_benchmarks.ps1, run_prbvh_benchmarks.ps1, plot_build.py
 results/   results.csv, build.csv, build_render.csv, traversal.csv, dynamic.csv, prbvh.csv,
-           prbvh_render.csv, v1/ (the
+           prbvh_render.csv, prbvh_vs_cpu_render.csv, prbvh_traversal.csv, v1/ (the
            previous run) and plots/
 renders/   output images
 ```

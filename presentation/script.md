@@ -260,7 +260,8 @@ mine takes 1.4 to 1.9 times the LBVH's time, and I know where that goes.
 size. So I added a scene with mixed sizes: huge ground triangles, thin pillars, and objects at very
 different scales. And I replaced the binned SAH reference with a full sweep that tries every split.
 On the scans binning is within one percent of it; on the mixed scene it is 11 percent worse, and
-**TRBVH beats the CPU SAH builder** while building 16 times faster. I also made the timing fairer:
+**TRBVH's SAH cost is lower than the CPU builder's** while it builds 16 times faster. *[Point to the
+footnote.]* That doesn't make it render faster, though: rays do slightly more box tests on it. I also made the timing fairer:
 warm-up, eleven interleaved runs and medians. The clocks can't be locked without admin rights, so
 the quality claims rest on SAH cost and traversal counters, which are deterministic.
 
@@ -278,9 +279,11 @@ where else could this node go so the tree's SAH cost drops the most? Moves that 
 same nodes are applied together: each one locks its six nodes with an atomic max, the winners
 move, and the boxes are refitted. After eight rounds every GPU tree is within a few percent of the
 full-sweep reference on the scans, and TRBVH plus PRBVH beats it. On the mixed scene all four end up
-5 to 15 percent **better** than the full sweep, which is still greedy at the top. H-PLOC plus PRBVH
-builds the dragon in 150 milliseconds with a better tree than the CPU builder's 770. Renders get 16
-to 42 percent faster, so the extra time pays off after 11 to 50 frames.
+5 to 15 percent **lower in SAH cost** than the full sweep, which is still greedy at the top. H-PLOC
+plus PRBVH builds the dragon in 150 milliseconds with a tree as good by SAH cost as the CPU
+builder's, which takes 770. Each builder's renders get 16 to 42 percent faster, so the extra time
+pays off after 11 to 50 frames. But SAH is a model: against the CPU SAH trees themselves, these
+trees render within about 3 percent, so the big gains come from fixing the weaker trees.
 
 ## Slide 25: Dynamic scenes: rebuild every frame (0:30)
 
@@ -300,7 +303,7 @@ leaf collapse into the build. And I'd still like to try the 28-million-triangle 
 To sum up: going from my ten-sphere Python ray tracer to a million triangles took two steps. A BVH
 made each ray's search logarithmic, and the GPU ran millions of those searches at once. And now the
 GPU builds that tree too: in milliseconds close to the best CPU builder's quality, or in a sixth
-of a second better than it. Thank you,
+of a second as good as it. Thank you,
 and I'm happy to take questions.
 
 ---
@@ -322,6 +325,13 @@ and I'm happy to take questions.
   best split at each node from the top down and never revisits it. Reinsertion measures the whole
   tree's cost and moves subtrees across those early splits. The mixed scene, with huge and tiny
   triangles meeting near the root, is where the greedy choice is worst.
+- **Does a lower SAH cost mean a faster render?** Only loosely. SAH assumes rays come uniformly
+  from all directions and that every test costs the same. On the mixed scene a 15 % lower SAH
+  cost gave 9 % fewer box tests but only a 2–5 % faster render. On the dragon the full-sweep tree
+  still renders fastest, even against PRBVH trees with the same box tests per ray.
+- **Were the render times measured on the GPU?** Both. The PRBVH render gains are GPU kernel times;
+  the "Render" columns on slides 19 and 23 are one-thread CPU times, which were steadier on this
+  shared desktop GPU.
 - **Why are PRBVH's CPU and GPU trees identical?** Each round is a pure function of the tree at the
   start of the round. Ties are broken by the node's in-order position, not by its id, so the
   H-PLOC tree (whose GPU ids come from an atomic counter) makes the same moves on both.

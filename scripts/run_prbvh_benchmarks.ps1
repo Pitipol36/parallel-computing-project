@@ -61,4 +61,25 @@ foreach ($m in $dragon, $mixed) {
                  "--ao", "16", "--mode", "gpu_bvh_opt", "--runs", $qruns, "--tag", $tag, "--csv", $renderCsv)
     }
 }
+# 4. SAH cost vs render time: PRBVH trees against the CPU SAH trees, interleaved in one run, plus
+#    box tests per ray on the PRBVH trees (needs build-stats\, scripts\build.ps1 -Stats).
+if (-not $BuildOnly) {
+    $cmpCsv = "results\prbvh_vs_cpu_render.csv"; $travCsv = "results\prbvh_traversal.csv"
+    foreach ($f in $cmpCsv, $travCsv) { if (Test-Path $f) { Remove-Item $f } }
+    $statsExe = Join-Path $root "build-stats\raytracer.exe"
+    foreach ($m in $dragon, $mixed) {
+        Run $m @("--quality-bench", "--build", "cpu_sah,cpu_sah_full,gpu_hploc,gpu_trbvh", "--optimize", "prbvh",
+                 "--width", "1920", "--height", "1080", "--ao", "16", "--mode", "gpu_bvh_opt,cpu", "--runs", $qruns,
+                 "--cpu-runs", "1", "--tag", "prb", "--csv", $cmpCsv)
+        if (Test-Path $statsExe) {
+            foreach ($b in "gpu_hploc", "gpu_trbvh") {
+                $a = @("--model", $m.file, "--label", $m.label, "--up", $m.up, "--cam", $m.cam, "--build", $b,
+                       "--optimize", "prbvh", "--width", "1920", "--height", "1080", "--ao", "16",
+                       "--mode", "gpu_bvh_opt", "--runs", "1", "--warmup", "0", "--tag", "prbvh",
+                       "--stats-csv", $travCsv)
+                & $statsExe @a
+            }
+        }
+    }
+}
 Write-Host "`nwrote $csv and $renderCsv"

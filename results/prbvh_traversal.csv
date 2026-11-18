@@ -1,0 +1,5 @@
+experiment,model,tris,builder,mode,width,height,ao,rays,box_tests_per_ray,tri_tests_per_ray
+prbvh,dragon,871414,gpu_hploc,gpu_bvh_opt,1920,1080,16,6914179,45.9898,3.42856
+prbvh,dragon,871414,gpu_trbvh,gpu_bvh_opt,1920,1080,16,6914179,44.6179,3.42885
+prbvh,mixed,1081503,gpu_hploc,gpu_bvh_opt,1920,1080,16,26819652,22.3499,0.489266
+prbvh,mixed,1081503,gpu_trbvh,gpu_bvh_opt,1920,1080,16,26819652,22.3817,0.518543
