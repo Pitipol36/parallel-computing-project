@@ -18,6 +18,6 @@
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">22 · Render = 1-thread CPU render time on each tree, 1080p, 16 AO. Quality order on every model: LBVH &lt; PLOC ≈ H-PLOC &lt; TRBVH &lt; SAH.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">23 · Render = 1-thread CPU render time on each tree, 1080p, 16 AO. Quality order on every model: LBVH &lt; PLOC ≈ H-PLOC &lt; TRBVH &lt; SAH.</p>
 <aside>Here are all the builders on one chart: build time against tree quality, lower left is better. Every GPU builder sits on the front. The LBVH is the fastest by far but its tree is 19 to 30 percent worse on the scans. H-PLOC takes 1.4 to 1.9 times as long and roughly halves that loss, and it is faster than PLOC at the same quality. TRBVH takes another six times as long and gets within 6 percent of the full-sweep reference, while still building 13 to 16 times faster than the CPU SAH builder. The ordering matches what the papers report. On rendering, the TRBVH tree is only 7 percent slower than the reference on the Buddha. So the choice depends on how many rays a tree will serve: the LBVH for previews and anything that moves, TRBVH when the tree will be used for many frames. The CPU SAH tree only pays for its build after hundreds to thousands of full-HD frames.</aside>
 </section>

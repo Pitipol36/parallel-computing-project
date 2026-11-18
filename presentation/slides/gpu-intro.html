@@ -1,0 +1,34 @@
+<section id="gpu-intro" data-transition="fade" style="background:#10172A;color:#F3F4F1;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:44px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F28A5E;letter-spacing:2px;text-transform:uppercase">Part 2 · BVH construction</p>
+<h2 style="font-size:72px;font-weight:600;line-height:1.1;color:#F3F4F1">Recap: fast rays, slow tree</h2>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px">
+<div style="display:flex;flex-direction:column;gap:12px;background:#1B2540;padding:40px;border-radius:16px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F28A5E">~45</p>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">box tests per ray instead of 871K triangle tests: the SAH BVH makes each ray's search logarithmic.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;background:#1B2540;padding:40px;border-radius:16px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F28A5E">35–180×</p>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">faster tracing on the GPU than one tuned CPU core, with the same tree and the same rays.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;background:#1B2540;padding:40px;border-radius:16px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F28A5E">97 %</p>
+<p style="font-size:24px;line-height:1.4;color:#C9D1E0">of the time to the first image is now the 0.8 s single-threaded SAH build (dragon).</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px;background:#F3F4F1;padding:40px;border-radius:16px">
+<p style="font-size:32px;font-weight:600;line-height:1.3;color:#10172A">Next: build the tree on the GPU. How much quality does a fast build cost?</p>
+<div style="display:flex;gap:16px;align-items:center">
+<p style="flex:1;font-size:26px;font-weight:600;line-height:64px;text-align:center;background:#2A78D6;color:#FCFCFB;border-radius:12px">LBVH</p>
+<p style="font-size:32px;color:#4A5263">→</p>
+<p style="flex:1;font-size:26px;font-weight:600;line-height:64px;text-align:center;background:#1A8F64;color:#FCFCFB;border-radius:12px">PLOC · H-PLOC</p>
+<p style="font-size:32px;color:#4A5263">→</p>
+<p style="flex:1;font-size:26px;font-weight:600;line-height:64px;text-align:center;background:#B8366A;color:#FCFCFB;border-radius:12px">TRBVH</p>
+<p style="font-size:32px;color:#4A5263">→</p>
+<p style="flex:1;font-size:26px;font-weight:600;line-height:64px;text-align:center;background:#10172A;color:#F3F4F1;border-radius:12px">+ PRBVH</p>
+</div>
+<p style="font-size:24px;line-height:1.4;color:#4A5263">Left to right: slower to build, tighter tree. Sort by position → cluster → restructure → reinsert.</p>
+</div>
+<aside>Before the follow-up, a quick recap of where the first part left off. The BVH is what makes this possible at all: instead of testing all 871 thousand triangles, a ray on the dragon does about 45 box tests down a 26-level tree. The GPU then traces those rays 35 to 180 times faster than one tuned CPU core, with exactly the same tree. But that moved the bottleneck. The render now takes milliseconds, while building the SAH tree on one core still takes about 0.8 seconds, which is 97 percent of the time to the first image on the dragon. So the second part is about construction: can the GPU build the tree too, and how much tree quality does a fast build cost? I'll go from the fastest builder to the best tree: LBVH sorts triangles by position, PLOC and H-PLOC cluster them, TRBVH restructures the LBVH, and parallel reinsertion polishes any of them.</aside>
+</section>

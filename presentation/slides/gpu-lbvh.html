@@ -18,6 +18,6 @@
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">17 · Median of 5 builds. Every GPU tree is node-for-node identical to its CPU version and renders the same hit IDs as the SAH tree.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">18 · Median of 5 builds. Every GPU tree is node-for-node identical to its CPU version and renders the same hit IDs as the SAH tree.</p>
 <aside>After the presentation I tackled the biggest remaining cost: the single-threaded BVH build. The first GPU version is Karras's LBVH. Every triangle gets a 63-bit Morton code from its centroid, a radix sort orders them along a space-filling curve, and then one thread per internal node finds its range and split in parallel. A bottom-up pass with atomic counters fits the boxes, and a final pass decides by SAH cost which small subtrees become leaves and flattens the tree into exactly the node layout the render kernels already use. On the dragon it builds in under 5 milliseconds, 160 times faster than the CPU SAH builder and 67 times faster than the same LBVH algorithm on one core. The chart also shows the three higher-quality builders I come to next. Each GPU tree is bit-for-bit identical to its CPU version, and every builder renders exactly the same triangle per pixel.</aside>
 </section>

@@ -40,6 +40,6 @@
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">19 · Both build node-for-node the same tree as their single-threaded CPU versions; 0 sanitizer errors or hazards</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">20 · Both build node-for-node the same tree as their single-threaded CPU versions; 0 sanitizer errors or hazards</p>
 <aside>To win back the quality, I built two higher-quality GPU builders. PLOC clusters bottom-up: starting from single triangles in Morton order, every cluster looks at its eight neighbours on each side and finds the one whose merged box is smallest; mutual nearest neighbours merge, and a scan I wrote myself, the same pattern as the scan lab, compacts the survivors. Its tree is 12 percent above the full-sweep SAH reference, and it builds the Buddha in 18 milliseconds. TRBVH starts from the LBVH and improves it: under every large node it grows a treelet of seven subtrees and runs a small dynamic program over all 127 subsets to find the best possible shape for that treelet. On the GPU a whole warp cooperates on each treelet, which made it 10 times faster than one thread per treelet. Its tree is within 6 percent of the full-sweep reference, in 70 milliseconds. For both, the GPU tree is identical to the CPU version, which is how I verified them.</aside>
 </section>

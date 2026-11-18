@@ -25,6 +25,6 @@
 </div>
 </div>
 </div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">20 · Radius 8, threshold 16. The CPU twin flattens to the identical tree; 0 sanitizer errors or hazards on the cluster lists.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">21 · Radius 8, threshold 16. The CPU twin flattens to the identical tree; 0 sanitizer errors or hazards on the cluster lists.</p>
 <aside>PLOC's weakness is its loop: on the dragon it runs 68 iterations, each with four or more kernel launches and a readback to the CPU to learn how many clusters are left. H-PLOC, published last year, removes the loop entirely. One kernel launch builds the whole tree: every thread starts at a leaf and climbs the Morton-code hierarchy bottom-up, and as with the LBVH fit, the second thread to arrive at a node carries on. Each node holds a short list of clusters. When the two children's lists together exceed sixteen, the whole warp loads them into shared memory and runs PLOC merges on them until sixteen are left; at the root it merges down to one. The result: the same tree quality as PLOC, 1.4 to 4.1 times faster. The paper gets within about 15 percent of the LBVH's time; mine takes 1.4 to 1.9 times the LBVH's time, mostly the merging itself and a slower flatten step, because the atomically assigned node ids scatter the tree in memory.</aside>
 </section>
